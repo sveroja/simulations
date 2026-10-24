@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Die Berg-Analogie: Potential und Feldstärke</title>
+<style>
+  :root {
+    --bg: #eef3f8;
+    --sky-top: #dceeff;
+    --sky-bottom: #f5fbff;
+    --hill: #4a7c3f;
+    --hill-dark: #3a6230;
+    --ink: #1f2d3d;
+    --accent: #c0392b;
+    --accent2: #2461a8;
+    --panel: #ffffff;
+    --border: #c6d3de;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", Calibri, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 40px;
+  }
+  h1 {
+    font-size: 1.5rem;
+    margin: 0 0 4px;
+    text-align: center;
+  }
+  .subtitle {
+    color: #4a5b6b;
+    margin-bottom: 18px;
+    text-align: center;
+    max-width: 720px;
+    font-size: 0.98rem;
+  }
+  .stage {
+    position: relative;
+    width: min(920px, 96vw);
+    background: linear-gradient(var(--sky-top), var(--sky-bottom));
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 6px 18px rgba(20,40,60,0.12);
+  }
+  svg { display: block; width: 100%; height: auto; }
+  .controls {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin: 14px 0 4px;
+  }
+  .slider-wrap {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 22px;
+    width: min(560px, 92vw);
+    text-align: center;
+  }
+  .slider-wrap label { display:block; margin-bottom: 8px; font-size: 0.95rem; }
+  .slider-wrap input[type=range] {
+    width: 100%;
+    accent-color: var(--accent2);
+  }
+  button {
+    font-size: 0.95rem;
+    padding: 10px 18px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    cursor: pointer;
+    color: var(--ink);
+    transition: transform .08s ease, box-shadow .15s ease;
+  }
+  button:hover { box-shadow: 0 3px 10px rgba(20,40,60,0.15); }
+  button:active { transform: translateY(1px); }
+  button.primary { background: var(--accent2); color: white; border-color: var(--accent2); }
+  button.hom-btn { background: #fdf0e0; border-color: #b5651d; color: #7a4310; }
+  button.hom-btn.active { background: #b5651d; color: white; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .readout {
+    width: min(920px, 96vw);
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    text-align: center;
+  }
+  .card .label { font-size: 0.8rem; color: #5c6b7a; margin-bottom: 4px; }
+  .card .value { font-size: 1.15rem; font-weight: 600; }
+  .card.u .value { color: var(--accent); }
+
+  .legend {
+    width: min(920px, 96vw);
+    margin-top: 16px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 0.92rem;
+    line-height: 1.5;
+  }
+  .legend b.field { color: var(--accent2); }
+  .legend b.pot { color: var(--hill-dark); }
+
+  .tag {
+    font-family: "Cambria Math", Cambria, serif;
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+<p style="align-self:flex-start;margin:0 0 .6rem"><a href="../" style="color:#4a5b6b">← Zur Übersicht</a></p>
+
+<h1>Vom Hang zum elektrischen Feld</h1>
+<p class="subtitle">
+  Die <b style="color:var(--hill-dark)">Höhe</b> des Hangs entspricht dem <b style="color:var(--hill-dark)">Potential φ</b>.
+  Die <b style="color:var(--accent2)">Steilheit</b> an einer Stelle entspricht der <b style="color:var(--accent2)">Feldstärke E</b>.
+  Bewegen Sie die Kugel und beobachten Sie, wie sich beide Größen verändern.
+</p>
+
+<div class="stage">
+  <svg id="scene" viewBox="0 0 920 420" xmlns="http://www.w3.org/2000/svg">
+    <!-- sky decorations -->
+    <circle cx="120" cy="70" r="26" fill="#fff7d6" opacity="0.9"/>
+    <g opacity="0.55" fill="#ffffff">
+      <ellipse cx="740" cy="80" rx="46" ry="16"/>
+      <ellipse cx="775" cy="70" rx="34" ry="13"/>
+      <ellipse cx="700" cy="70" rx="30" ry="12"/>
+    </g>
+
+    <!-- charge symbol at r=0 (left) -->
+    <g transform="translate(70,330)">
+      <circle r="16" fill="#8b1e1e"/>
+      <text x="0" y="6" text-anchor="middle" fill="white" font-size="18" font-weight="bold">–</text>
+      <text x="0" y="38" text-anchor="middle" font-size="13" fill="var(--ink)">Elektron (r = 0)</text>
+    </g>
+
+    <!-- hill path drawn by JS -->
+    <path id="hillFill" d="" fill="url(#hillGrad)" stroke="none"></path>
+    <path id="hillLine" d="" fill="none" stroke="var(--hill-dark)" stroke-width="3"></path>
+
+    <defs>
+      <linearGradient id="hillGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#6faa5b"/>
+        <stop offset="100%" stop-color="#3a6230"/>
+      </linearGradient>
+    </defs>
+
+    <!-- r-axis ticks -->
+    <g id="ticks" font-size="12" fill="#4a5b6b"></g>
+
+    <!-- markers phi1 / phi2 -->
+    <g id="markerPhi1"></g>
+    <g id="markerPhi2"></g>
+    <g id="markerPhi3"></g>
+
+    <!-- homogenes-Feld Vergleichsgerade (togglebar) -->
+    <line id="homLine" x1="0" y1="0" x2="0" y2="0" stroke="#b5651d" stroke-width="3" stroke-dasharray="8 5" opacity="0"/>
+    <text id="homLabel" x="0" y="0" font-size="13" fill="#b5651d" font-weight="600" opacity="0"></text>
+
+    <!-- tangent / slope indicator -->
+    <line id="tangent" x1="0" y1="0" x2="0" y2="0" stroke="var(--accent2)" stroke-width="4" stroke-linecap="round"/>
+
+    <!-- ball -->
+    <g id="ball">
+      <circle r="14" fill="#c0392b" stroke="#7c1f16" stroke-width="2"/>
+      <text x="0" y="5" text-anchor="middle" fill="white" font-size="13" font-weight="bold">q</text>
+    </g>
+
+    <!-- floating live label -->
+    <g id="liveLabel"></g>
+  </svg>
+</div>
+
+<div class="controls">
+  <div class="slider-wrap">
+    <label for="rSlider">Abstand r: <span id="rSliderVal">1,0 mm</span></label>
+    <input type="range" id="rSlider" min="1" max="6" step="0.02" value="1">
+  </div>
+</div>
+<div class="controls">
+  <button id="toPhi1">⟵ Springe zu φ₁ (r = 1 mm)</button>
+  <button id="toPhi2" class="primary">Springe zu φ₂ (r = 3 mm) ⟶</button>
+  <button id="toPhi3">Springe zu φ₃ (r = 5 mm) ⟶⟶</button>
+  <button id="resetBtn">Zurücksetzen</button>
+</div>
+<div class="controls">
+  <button id="toggleHom" class="hom-btn">Vergleich einblenden: homogenes Feld (E = U/l, Gerade)</button>
+</div>
+
+<div class="readout">
+  <div class="card">
+    <div class="label">Abstand r</div>
+    <div class="value" id="rOut">1,0 mm</div>
+  </div>
+  <div class="card">
+    <div class="label">Potential φ (Höhe)</div>
+    <div class="value" id="phiOut">−1,44 · 10⁻⁶ V</div>
+  </div>
+  <div class="card">
+    <div class="label">Feldstärke E (Steilheit)</div>
+    <div class="value" id="eOut">−1,44 · 10⁻³ V/m</div>
+  </div>
+</div>
+
+<div class="readout" style="grid-template-columns: 1fr;">
+  <div class="card u">
+    <div class="label">Spannung U = φ(aktuell) − φ₁</div>
+    <div class="value" id="uOut">– Kugel steht auf φ₁, noch kein Höhenunterschied –</div>
+  </div>
+</div>
+
+<div class="legend">
+  <b class="pot">Höhe des Hangs = Potential φ:</b> An jedem Ort hat der Hang eine feste Höhe — unabhängig davon, ob dort gerade eine Kugel liegt.<br>
+  <b class="field">Steilheit an einem Punkt = Feldstärke E:</b> Sie zeigt, wie stark die Kugel dort rollen würde, wenn man sie loslässt — je steiler, desto größer E.<br>
+  Bewegt man die Kugel von φ₁ nach φ₂, entspricht der <b>Höhenunterschied</b> genau der <b style="color:var(--accent)">Spannung U</b>. Die tatsächlich benötigte Arbeit hängt zusätzlich von der Größe der Ladung q ab: <span class="tag">W = q·U</span>.
+</div>
+
+<script>
+(function(){
+  // ---- physical constants (echte Formeln, wie im Arbeitsblatt) ----
+  const e = 1.602e-19;      // C
+  const eps0 = 8.854e-12;   // As/Vm
+  const k = 1/(4*Math.PI*eps0);
+
+  function phi(r_m){ return e*k/r_m; }   // V  (Betrag, Vorzeichen separat behandelt)
+  function Efield(r_m){ return e*k/(r_m*r_m); } // V/m (Betrag)
+
+  // ---- geometry mapping ----
+  const rMin = 1, rMax = 6; // mm, visible range
+  const xLeft = 130, xRight = 860;
+  const yBase = 340;        // baseline (r-axis) on screen
+  const hMax = 230;         // pixel height at r = 1mm (visual scale, NICHT maßstäblich)
+
+  function rToX(r_mm){ return xLeft + (r_mm-rMin)/(rMax-rMin) * (xRight-xLeft); }
+  function xToR(x){ return rMin + (x-xLeft)/(xRight-xLeft) * (rMax-rMin); }
+  function rToY(r_mm){
+    // Hoehe proportional zu phi(r)/phi(1mm) -> Kurvenform folgt echtem 1/r Verlauf
+    const rel = phi(0.001) > 0 ? phi(r_mm/1000)/phi(0.001) : 0;
+    return yBase - hMax*rel;
+  }
+
+  // ---- build hill path ----
+  const svgNS = "http://www.w3.org/2000/svg";
+  let d = `M ${xLeft} ${yBase}`;
+  const N = 140;
+  const pts = [];
+  for(let i=0;i<=N;i++){
+    const r = rMin + (rMax-rMin)*i/N;
+    const x = rToX(r);
+    const y = rToY(r);
+    pts.push([x,y]);
+    d += ` L ${x.toFixed(1)} ${y.toFixed(1)}`;
+  }
+  document.getElementById('hillLine').setAttribute('d', d);
+  const fillD = d + ` L ${xRight} ${yBase} Z`;
+  document.getElementById('hillFill').setAttribute('d', fillD);
+
+  // ---- r-axis ticks ----
+  const ticksG = document.getElementById('ticks');
+  for(let r=1;r<=6;r++){
+    const x = rToX(r);
+    const tick = document.createElementNS(svgNS,'line');
+    tick.setAttribute('x1',x); tick.setAttribute('x2',x);
+    tick.setAttribute('y1',yBase); tick.setAttribute('y2',yBase+8);
+    tick.setAttribute('stroke','#4a5b6b'); tick.setAttribute('stroke-width','1.5');
+    ticksG.appendChild(tick);
+    const txt = document.createElementNS(svgNS,'text');
+    txt.setAttribute('x',x); txt.setAttribute('y',yBase+24);
+    txt.setAttribute('text-anchor','middle');
+    txt.textContent = r + ' mm';
+    ticksG.appendChild(txt);
+  }
+  const axisLabel = document.createElementNS(svgNS,'text');
+  axisLabel.setAttribute('x', (xLeft+xRight)/2);
+  axisLabel.setAttribute('y', yBase+46);
+  axisLabel.setAttribute('text-anchor','middle');
+  axisLabel.setAttribute('font-size','13');
+  axisLabel.setAttribute('fill','#4a5b6b');
+  axisLabel.textContent = 'Abstand r zur Ladung';
+  ticksG.appendChild(axisLabel);
+
+  // ---- markers phi1 (r=1) und phi2 (r=3) ----
+  function buildMarker(gId, r_mm, label, color){
+    const g = document.getElementById(gId);
+    const x = rToX(r_mm), y = rToY(r_mm);
+    g.innerHTML = `
+      <line x1="${x}" y1="${y}" x2="${x}" y2="${yBase}" stroke="${color}" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <circle cx="${x}" cy="${y}" r="5" fill="${color}"/>
+      <text x="${x}" y="${y-14}" text-anchor="middle" font-size="14" font-weight="600" fill="${color}">${label}</text>
+    `;
+  }
+  buildMarker('markerPhi1', 1, 'φ₁', '#2461a8');
+  buildMarker('markerPhi2', 3, 'φ₂', '#8b1e1e');
+  buildMarker('markerPhi3', 5, 'φ₃', '#1e7a4a');
+
+  // ---- homogenes Feld Vergleichsgerade ----
+  const homLine = document.getElementById('homLine');
+  const homLabel = document.getElementById('homLabel');
+  let homVisible = false;
+  function drawHomLine(){
+    const x1 = rToX(rMin), y1 = rToY(rMin);
+    const x2 = rToX(rMax), y2 = yBase;
+    homLine.setAttribute('x1', x1); homLine.setAttribute('y1', y1);
+    homLine.setAttribute('x2', x2); homLine.setAttribute('y2', y2);
+    homLabel.setAttribute('x', (x1+x2)/2 + 30);
+    homLabel.setAttribute('y', (y1+y2)/2 - 10);
+    homLabel.textContent = 'homogenes Feld: E = U/l (konstante Steigung)';
+  }
+  drawHomLine();
+  document.getElementById('toggleHom').addEventListener('click', function(){
+    homVisible = !homVisible;
+    homLine.style.opacity = homVisible ? '0.9' : '0';
+    homLabel.style.opacity = homVisible ? '1' : '0';
+    this.classList.toggle('active', homVisible);
+    this.textContent = homVisible
+      ? 'Vergleich ausblenden: homogenes Feld'
+      : 'Vergleich einblenden: homogenes Feld (E = U/l, Gerade)';
+  });
+
+  // ---- ball + tangent + live label ----
+  const ball = document.getElementById('ball');
+  const tangent = document.getElementById('tangent');
+  const liveLabel = document.getElementById('liveLabel');
+
+  function fmt(val, unit){
+    if (val === null) return '–';
+    const exp = Math.floor(Math.log10(Math.abs(val)));
+    const mant = val / Math.pow(10, exp);
+    return `−${mant.toFixed(2)} · 10${supersc(exp)} ${unit}`;
+  }
+  function supersc(n){
+    const map = {'-':'⁻','0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹'};
+    return String(n).split('').map(c=>map[c]||c).join('');
+  }
+
+  function updateReadout(r_mm){
+    const r_m = r_mm/1000;
+    const phiVal = phi(r_m);
+    const eVal = Efield(r_m);
+    document.getElementById('rOut').textContent = r_mm.toFixed(1).replace('.',',') + ' mm';
+    document.getElementById('phiOut').textContent = fmt(phiVal, 'V');
+    document.getElementById('eOut').textContent = fmt(eVal, 'V/m');
+  }
+
+  function placeBallAt(r_mm, showTangent){
+    const x = rToX(r_mm), y = rToY(r_mm);
+    ball.setAttribute('transform', `translate(${x},${y-16})`);
+
+    // numeric slope (finite difference) for tangent visualisation
+    const dr = 0.02;
+    const y1 = rToY(Math.max(rMin, r_mm-dr));
+    const y2 = rToY(Math.min(rMax, r_mm+dr));
+    const x1 = rToX(Math.max(rMin, r_mm-dr));
+    const x2 = rToX(Math.min(rMax, r_mm+dr));
+    const len = 46;
+    const dx = x2-x1, dy = y2-y1;
+    const norm = Math.hypot(dx,dy) || 1;
+    const ux = dx/norm, uy = dy/norm;
+    tangent.setAttribute('x1', x - ux*len/2);
+    tangent.setAttribute('y1', (y-16) - uy*len/2);
+    tangent.setAttribute('x2', x + ux*len/2);
+    tangent.setAttribute('y2', (y-16) + uy*len/2);
+    tangent.style.opacity = showTangent ? '1' : '0';
+
+    liveLabel.innerHTML = `
+      <text x="${x}" y="${y-38}" text-anchor="middle" font-size="12" fill="var(--accent2)" font-weight="600">E (Steilheit)</text>
+    `;
+    updateReadout(r_mm);
+  }
+
+  let currentR = 1;
+  placeBallAt(currentR, true);
+
+  const slider = document.getElementById('rSlider');
+  const sliderVal = document.getElementById('rSliderVal');
+
+  function updateU(){
+    const phi1 = phi(0.001);
+    const phiCurrent = phi(currentR/1000);
+    const U = phiCurrent - phi1;
+    if (Math.abs(currentR-1) < 0.001) {
+      document.getElementById('uOut').textContent = '– Kugel steht auf φ₁, noch kein Höhenunterschied –';
+    } else {
+      document.getElementById('uOut').textContent =
+        `U = φ(aktuell) − φ₁ ≈ ${U>=0?'':'−'}${fmt(Math.abs(U),'V').replace('−','')}  (Höhenunterschied gegenüber φ₁)`;
+    }
+  }
+
+  function setR(r_mm, animate){
+    currentR = r_mm;
+    slider.value = r_mm.toFixed(2);
+    sliderVal.textContent = r_mm.toFixed(2).replace('.',',') + ' mm';
+    placeBallAt(currentR, true);
+    updateU();
+  }
+
+  slider.addEventListener('input', ()=>{
+    setR(parseFloat(slider.value));
+  });
+
+  function animateTo(targetR){
+    const startR = currentR;
+    const duration = 900;
+    const t0 = performance.now();
+    slider.disabled = true;
+    function step(now){
+      let t = Math.min(1, (now-t0)/duration);
+      const eased = t<0.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2;
+      const r = startR + (targetR-startR)*eased;
+      setR(r);
+      if(t<1){
+        requestAnimationFrame(step);
+      } else {
+        setR(targetR);
+        slider.disabled = false;
+      }
+    }
+    requestAnimationFrame(step);
+  }
+
+  document.getElementById('toPhi2').addEventListener('click', ()=> animateTo(3));
+  document.getElementById('toPhi3').addEventListener('click', ()=> animateTo(5));
+  document.getElementById('toPhi1').addEventListener('click', ()=> animateTo(1));
+  document.getElementById('resetBtn').addEventListener('click', ()=> animateTo(1));
+})();
+</script>
+
+</body>
+</html>

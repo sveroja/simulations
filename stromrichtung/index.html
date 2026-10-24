@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Technische und physikalische Stromrichtung</title>
+<style>
+  :root {
+    --bg: #eef3f8;
+    --sky-top: #dceeff;
+    --sky-bottom: #f5fbff;
+    --ink: #1f2d3d;
+    --panel: #ffffff;
+    --border: #c6d3de;
+    --accent: #c0392b;    /* technische Stromrichtung */
+    --accent2: #2461a8;   /* Elektronenstromrichtung */
+    --pb-fill: #eaf3ea;   --pb-border: #4a7c3f; --pb-dark:#3a6230;
+    --net-fill: #fdf0e0;  --net-border: #b5651d;
+    --handy-fill: #eaf3fb; --handy-border: #2461a8;
+    --inactive: #a9b4bd;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: "Segoe UI", Calibri, Arial, sans-serif;
+    background: var(--bg); color: var(--ink);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 24px 16px 40px;
+  }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; text-align: center; }
+  .subtitle { color: #4a5b6b; margin-bottom: 18px; text-align: center; max-width: 760px; font-size: 0.98rem; }
+
+  .stage {
+    position: relative; width: min(960px, 96vw);
+    background: linear-gradient(var(--sky-top), var(--sky-bottom));
+    border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
+    box-shadow: 0 6px 18px rgba(20,40,60,0.12);
+  }
+  svg { display: block; width: 100%; height: auto; }
+
+  .box-rect { stroke-width: 2; }
+  .box-pb { fill: var(--pb-fill); stroke: var(--pb-border); }
+  .box-net { fill: var(--net-fill); stroke: var(--net-border); }
+  .box-handy { fill: var(--handy-fill); stroke: var(--handy-border); }
+  .box-text { fill: var(--ink); font-size: 16px; font-weight: 600; text-anchor: middle; }
+  .terminal-label { fill: var(--ink); font-size: 15px; font-weight: 700; text-anchor: middle; }
+  .junction { fill: var(--ink); }
+
+  .wire-line { stroke: var(--ink); stroke-width: 3; fill: none; transition: stroke .25s, opacity .25s; }
+  .wire-line.inactive { stroke: var(--inactive); stroke-dasharray: 6 5; opacity: .8; }
+
+  .lane.tech circle { fill: var(--accent); }
+  .lane.electron circle { fill: none; stroke: var(--accent2); stroke-width: 2; stroke-dasharray: 3 2; }
+  .lane { transition: opacity .2s; }
+  .lane.hidden-electrons.electron { opacity: 0; }
+  .loop-inactive .lane { opacity: 0 !important; }
+
+  @keyframes flowForward  { from { offset-distance: 0%; } to { offset-distance: 100%; } }
+  @keyframes flowBackward { from { offset-distance: 100%; } to { offset-distance: 0%; } }
+  .dot.forward  { animation: flowForward 2.6s linear infinite; offset-rotate: 0deg; }
+  .dot.backward { animation: flowBackward 2.6s linear infinite; offset-rotate: 0deg; }
+  .dot.forward:nth-child(2), .dot.backward:nth-child(2) { animation-delay: -0.9s; }
+  .dot.forward:nth-child(3), .dot.backward:nth-child(3) { animation-delay: -1.8s; }
+
+  .switch-badge { font-size: 13px; font-weight: 600; text-anchor: middle; }
+  .switch-badge.open { fill: var(--inactive); }
+  .switch-badge.closed { fill: var(--ink); }
+
+  .controls { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin: 14px 0 4px; }
+  button {
+    font-size: 0.95rem; padding: 10px 18px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--panel); cursor: pointer;
+    color: var(--ink); transition: transform .08s ease, box-shadow .15s ease, background .15s;
+  }
+  button:hover { box-shadow: 0 3px 10px rgba(20,40,60,0.15); }
+  button:active { transform: translateY(1px); }
+  button.primary { background: var(--accent2); color: white; border-color: var(--accent2); }
+  button.elec-btn { background: #eaf1fb; border-color: var(--accent2); color: var(--accent2); }
+  button.elec-btn.active { background: var(--accent2); color: white; }
+
+  .readout {
+    width: min(960px, 96vw); display: grid; grid-template-columns: repeat(2, 1fr);
+    gap: 10px; margin-top: 14px;
+  }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 14px; text-align: center;
+  }
+  .card .label { font-size: 0.8rem; color: #5c6b7a; margin-bottom: 4px; }
+  .card .value { font-size: 1.15rem; font-weight: 600; }
+  .card.ah .value { color: var(--pb-dark); }
+
+  .legend {
+    width: min(960px, 96vw); margin-top: 16px; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px;
+    font-size: 0.92rem; line-height: 1.6;
+  }
+  .legend b.tech { color: var(--accent); }
+  .legend b.elec { color: var(--accent2); }
+  .mode-caption { margin-top: 6px; }
+</style>
+</head>
+<body>
+<p style="align-self:flex-start;margin:0 0 .6rem"><a href="../" style="color:#4a5b6b">← Zur Übersicht</a></p>
+
+<h1>Stromrichtung: zwei getrennte Stromkreise an der Powerbank</h1>
+<p class="subtitle">
+  Die Powerbank steht in der Mitte zweier getrennter Stromkreise: links das Netzteil (Ladekreis), rechts das Handy (Entladekreis).
+  Nur ein Kreis ist jeweils geschlossen. Wählen Sie den Betriebszustand und blenden Sie bei Bedarf die Elektronenstromrichtung aus.
+</p>
+
+<div class="stage">
+  <svg viewBox="0 0 920 420" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#dceeff"/>
+        <stop offset="100%" stop-color="#f5fbff"/>
+      </linearGradient>
+    </defs>
+    <rect width="920" height="420" fill="url(#bgGrad)"></rect>
+
+    <!-- ===== linker Stromkreis: Netzteil -> Powerbank ===== -->
+    <g id="leftCircuit">
+      <path class="wire-line" id="leftTop" d="M170,160 L170,70 L375,70 L375,160"></path>
+      <path class="wire-line" id="leftBottom" d="M170,220 L170,310 L375,310 L375,220"></path>
+      <circle class="junction" cx="170" cy="160" r="3"></circle>
+      <circle class="junction" cx="170" cy="220" r="3"></circle>
+      <circle class="junction" cx="375" cy="160" r="3"></circle>
+      <circle class="junction" cx="375" cy="220" r="3"></circle>
+      <text class="switch-badge" id="leftBadge" x="272" y="55">offen</text>
+
+      <g class="lane tech" id="leftTopTech">
+        <circle class="dot forward" cx="0" cy="0" r="5" style="offset-path: path('M170,160 L170,70 L375,70 L375,160')"></circle>
+        <circle class="dot forward" cx="0" cy="0" r="5" style="offset-path: path('M170,160 L170,70 L375,70 L375,160')"></circle>
+        <circle class="dot forward" cx="0" cy="0" r="5" style="offset-path: path('M170,160 L170,70 L375,70 L375,160')"></circle>
+      </g>
+      <g class="lane electron" id="leftTopElec">
+        <circle class="dot backward" cx="0" cy="0" r="4" style="offset-path: path('M170,160 L170,70 L375,70 L375,160')"></circle>
+        <circle class="dot backward" cx="0" cy="0" r="4" style="offset-path: path('M170,160 L170,70 L375,70 L375,160')"></circle>
+        <circle class="dot backward" cx="0" cy="0" r="4" style="offset-path: path('M170,160 L170,70 L375,70 L375,160')"></circle>
+      </g>
+      <g class="lane tech" id="leftBottomTech">
+        <circle class="dot backward" cx="0" cy="0" r="5" style="offset-path: path('M170,220 L170,310 L375,310 L375,220')"></circle>
+        <circle class="dot backward" cx="0" cy="0" r="5" style="offset-path: path('M170,220 L170,310 L375,310 L375,220')"></circle>
+        <circle class="dot backward" cx="0" cy="0" r="5" style="offset-path: path('M170,220 L170,310 L375,310 L375,220')"></circle>
+      </g>
+      <g class="lane electron" id="leftBottomElec">
+        <circle class="dot forward" cx="0" cy="0" r="4" style="offset-path: path('M170,220 L170,310 L375,310 L375,220')"></circle>
+        <circle class="dot forward" cx="0" cy="0" r="4" style="offset-path: path('M170,220 L170,310 L375,310 L375,220')"></circle>
+        <circle class="dot forward" cx="0" cy="0" r="4" style="offset-path: path('M170,220 L170,310 L375,310 L375,220')"></circle>
+      </g>
+    </g>
+
+    <!-- ===== rechter Stromkreis: Powerbank -> Handy ===== -->
+    <g id="rightCircuit">
+      <path class="wire-line" id="rightTop" d="M525,160 L525,70 L750,70 L750,160"></path>
+      <path class="wire-line" id="rightBottom" d="M525,220 L525,310 L750,310 L750,220"></path>
+      <circle class="junction" cx="525" cy="160" r="3"></circle>
+      <circle class="junction" cx="525" cy="220" r="3"></circle>
+      <circle class="junction" cx="750" cy="160" r="3"></circle>
+      <circle class="junction" cx="750" cy="220" r="3"></circle>
+      <text class="switch-badge" id="rightBadge" x="637" y="55">offen</text>
+
+      <g class="lane tech" id="rightTopTech">
+        <circle class="dot forward" cx="0" cy="0" r="5" style="offset-path: path('M525,160 L525,70 L750,70 L750,160')"></circle>
+        <circle class="dot forward" cx="0" cy="0" r="5" style="offset-path: path('M525,160 L525,70 L750,70 L750,160')"></circle>
+        <circle class="dot forward" cx="0" cy="0" r="5" style="offset-path: path('M525,160 L525,70 L750,70 L750,160')"></circle>
+      </g>
+      <g class="lane electron" id="rightTopElec">
+        <circle class="dot backward" cx="0" cy="0" r="4" style="offset-path: path('M525,160 L525,70 L750,70 L750,160')"></circle>
+        <circle class="dot backward" cx="0" cy="0" r="4" style="offset-path: path('M525,160 L525,70 L750,70 L750,160')"></circle>
+        <circle class="dot backward" cx="0" cy="0" r="4" style="offset-path: path('M525,160 L525,70 L750,70 L750,160')"></circle>
+      </g>
+      <g class="lane tech" id="rightBottomTech">
+        <circle class="dot backward" cx="0" cy="0" r="5" style="offset-path: path('M525,220 L525,310 L750,310 L750,220')"></circle>
+        <circle class="dot backward" cx="0" cy="0" r="5" style="offset-path: path('M525,220 L525,310 L750,310 L750,220')"></circle>
+        <circle class="dot backward" cx="0" cy="0" r="5" style="offset-path: path('M525,220 L525,310 L750,310 L750,220')"></circle>
+      </g>
+      <g class="lane electron" id="rightBottomElec">
+        <circle class="dot forward" cx="0" cy="0" r="4" style="offset-path: path('M525,220 L525,310 L750,310 L750,220')"></circle>
+        <circle class="dot forward" cx="0" cy="0" r="4" style="offset-path: path('M525,220 L525,310 L750,310 L750,220')"></circle>
+        <circle class="dot forward" cx="0" cy="0" r="4" style="offset-path: path('M525,220 L525,310 L750,310 L750,220')"></circle>
+      </g>
+    </g>
+
+    <!-- ===== Netzteil (links) — Schaltzeichen Spannungsquelle ===== -->
+    <rect class="box-rect box-net" x="20" y="140" width="150" height="100" rx="12"></rect>
+    <path d="M95,166 L95,160 L170,160" fill="none" stroke="#b5651d" stroke-width="2"></path>
+    <path d="M95,214 L95,220 L170,220" fill="none" stroke="#b5651d" stroke-width="2"></path>
+    <circle cx="95" cy="190" r="24" fill="none" stroke="#b5651d" stroke-width="2.5"></circle>
+    <line x1="95" y1="167" x2="95" y2="213" stroke="#b5651d" stroke-width="2.5"></line>
+    <text class="box-text" x="95" y="107" style="font-size:15px">Netzteil</text>
+
+    <!-- ===== Powerbank (Mitte) — Schaltzeichen Batterie (eine Zelle), an beide Stromkreise angeschlossen ===== -->
+    <rect class="box-rect box-pb" x="375" y="130" width="150" height="120" rx="14"></rect>
+    <line x1="375" y1="160" x2="525" y2="160" stroke="#4a7c3f" stroke-width="2"></line>
+    <line x1="375" y1="220" x2="525" y2="220" stroke="#4a7c3f" stroke-width="2"></line>
+    <line x1="450" y1="160" x2="450" y2="180" stroke="#4a7c3f" stroke-width="2"></line>
+    <line x1="433" y1="180" x2="467" y2="180" stroke="#4a7c3f" stroke-width="2.5"></line>
+    <line x1="441" y1="196" x2="459" y2="196" stroke="#4a7c3f" stroke-width="6"></line>
+    <line x1="450" y1="196" x2="450" y2="220" stroke="#4a7c3f" stroke-width="2"></line>
+    <text class="box-text" x="450" y="240" style="fill:#3a6230">Powerbank</text>
+    <text class="terminal-label" x="360" y="155">+</text>
+    <text class="terminal-label" x="360" y="228">−</text>
+    <text class="terminal-label" x="540" y="155">+</text>
+    <text class="terminal-label" x="540" y="228">−</text>
+
+    <!-- ===== Handy (rechts) ===== -->
+    <rect class="box-rect box-handy" x="750" y="140" width="150" height="100" rx="12"></rect>
+    <rect x="800" y="158" width="50" height="64" rx="8" fill="none" stroke="#2461a8" stroke-width="2"></rect>
+    <line x1="812" y1="210" x2="838" y2="210" stroke="#2461a8" stroke-width="2"></line>
+    <text class="box-text" x="825" y="200" style="font-size:15px">Handy</text>
+  </svg>
+</div>
+
+<div class="controls">
+  <button id="btnDischarge" class="primary">Entladen: Powerbank → Handy</button>
+  <button id="btnCharge">Aufladen: Netzteil → Powerbank</button>
+</div>
+<div class="controls">
+  <button id="btnElectrons" class="elec-btn active">Elektronenstromrichtung ausblenden</button>
+</div>
+
+<div class="readout">
+  <div class="card ah">
+    <div class="label">Ladung der Powerbank</div>
+    <div class="value" id="ahOut">5,00 Ah (5000 mAh)</div>
+  </div>
+  <div class="card">
+    <div class="label">Simulierte Zeit</div>
+    <div class="value" id="timeOut">00:00 h</div>
+  </div>
+</div>
+
+<div class="legend">
+  <div>Angenommen: konstanter Strom <em>I</em> = 2 A, Kapazität 10 Ah. Zeit stark beschleunigt (1 s ≙ 2 min simuliert).</div>
+  <div><b class="tech">●</b> Technische Stromrichtung (Konvention: vom Plus- zum Minuspol)</div>
+  <div><b class="elec">◌</b> Elektronenstromrichtung (tatsächliche Bewegung: vom Minus- zum Pluspol)</div>
+  <div class="mode-caption" id="modeCaption">
+    Entladen: Der rechte Stromkreis (Powerbank–Handy) ist geschlossen. Der linke Stromkreis (Netzteil–Powerbank) ist offen.
+  </div>
+</div>
+
+<script>
+  const leftCircuit = document.getElementById('leftCircuit');
+  const rightCircuit = document.getElementById('rightCircuit');
+  const leftTop = document.getElementById('leftTop');
+  const leftBottom = document.getElementById('leftBottom');
+  const rightTop = document.getElementById('rightTop');
+  const rightBottom = document.getElementById('rightBottom');
+  const leftBadge = document.getElementById('leftBadge');
+  const rightBadge = document.getElementById('rightBadge');
+  const btnDischarge = document.getElementById('btnDischarge');
+  const btnCharge = document.getElementById('btnCharge');
+  const btnElectrons = document.getElementById('btnElectrons');
+  const caption = document.getElementById('modeCaption');
+
+  let mode = 'discharge'; // discharge -> rechter Kreis aktiv, charge -> linker Kreis aktiv
+  let electronsVisible = true;
+
+  const texts = {
+    discharge: "Entladen: Der rechte Stromkreis (Powerbank–Handy) ist geschlossen. Der linke Stromkreis (Netzteil–Powerbank) ist offen. Der technische Strom fließt vom Pluspol der Powerbank durch das Handy zurück zum Minuspol; die Elektronen bewegen sich tatsächlich in die entgegengesetzte Richtung.",
+    charge: "Aufladen: Der linke Stromkreis (Netzteil–Powerbank) ist geschlossen. Der rechte Stromkreis (Powerbank–Handy) ist offen. Der technische Strom fließt nun in den Pluspol der Powerbank hinein; die Bewegungsrichtung von Strom und Elektronen kehrt sich gegenüber dem Entladen um."
+  };
+
+  function applyMode() {
+    const dischargeActive = mode === 'discharge';
+
+    leftCircuit.classList.toggle('loop-inactive', dischargeActive);
+    rightCircuit.classList.toggle('loop-inactive', !dischargeActive);
+
+    [leftTop, leftBottom].forEach(el => el.classList.toggle('inactive', dischargeActive));
+    [rightTop, rightBottom].forEach(el => el.classList.toggle('inactive', !dischargeActive));
+
+    leftBadge.textContent = dischargeActive ? 'offen' : 'geschlossen';
+    leftBadge.setAttribute('class', 'switch-badge ' + (dischargeActive ? 'open' : 'closed'));
+    rightBadge.textContent = dischargeActive ? 'geschlossen' : 'offen';
+    rightBadge.setAttribute('class', 'switch-badge ' + (dischargeActive ? 'closed' : 'open'));
+
+    btnDischarge.classList.toggle('primary', dischargeActive);
+    btnCharge.classList.toggle('primary', !dischargeActive);
+
+    caption.textContent = texts[mode];
+  }
+
+  function applyElectrons() {
+    document.querySelectorAll('.lane.electron').forEach(el => {
+      el.classList.toggle('hidden-electrons', !electronsVisible);
+    });
+    btnElectrons.classList.toggle('active', electronsVisible);
+    btnElectrons.textContent = electronsVisible
+      ? 'Elektronenstromrichtung ausblenden'
+      : 'Elektronenstromrichtung einblenden';
+  }
+
+  btnDischarge.addEventListener('click', () => { mode = 'discharge'; applyMode(); });
+  btnCharge.addEventListener('click', () => { mode = 'charge'; applyMode(); });
+  btnElectrons.addEventListener('click', () => { electronsVisible = !electronsVisible; applyElectrons(); });
+
+  applyMode();
+  applyElectrons();
+
+  // ===== Ah-Zähler über die simulierte Zeit =====
+  const capacity = 10;      // Ah, Gesamtkapazität der Powerbank
+  const current = 2;        // A, angenommener konstanter Strom
+  const accel = 120;        // simulierte Sekunden pro Realsekunde
+  let charge = 5;           // Ah, Startladung
+  let simSeconds = 0;
+  let lastTs = null;
+
+  const ahOut = document.getElementById('ahOut');
+  const timeOut = document.getElementById('timeOut');
+
+  function fmtAh(v) {
+    return v.toFixed(2).replace('.', ',') + ' Ah (' + Math.round(v * 1000) + ' mAh)';
+  }
+  function fmtTime(s) {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ' h';
+  }
+
+  function tick(ts) {
+    if (lastTs === null) lastTs = ts;
+    const dtReal = (ts - lastTs) / 1000;
+    lastTs = ts;
+    const dtSim = dtReal * accel;
+    simSeconds += dtSim;
+    const dAh = current * dtSim / 3600;
+    charge += (mode === 'charge' ? dAh : -dAh);
+    charge = Math.max(0, Math.min(capacity, charge));
+    ahOut.textContent = fmtAh(charge);
+    timeOut.textContent = fmtTime(simSeconds);
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+</script>
+
+</body>
+</html>
