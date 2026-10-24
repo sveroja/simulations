@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Induktionsgesetz – Animation</title>
+<style>
+:root {
+  --bg: #f4f6f9; --surface: #ffffff; --ink: #1c2430; --muted: #5b6675;
+  --grid: #dfe4eb; --axis: #98a3b1; --phi: #1f6fb2; --u: #c2410c;
+  --north: #d23a2f; --south: #2f8a4f; --copper: #b8732e; --core: #cfd4db; --focus: #1f6fb2;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161c; --surface: #1a2029; --ink: #e6ebf1; --muted: #9aa6b4;
+    --grid: #29323e; --axis: #56657a; --phi: #5aa6e8; --u: #f08a4b;
+    --north: #e5584d; --south: #45a96a; --copper: #d08a45; --core: #3a4350; --focus: #5aa6e8;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12161c; --surface: #1a2029; --ink: #e6ebf1; --muted: #9aa6b4;
+  --grid: #29323e; --axis: #56657a; --phi: #5aa6e8; --u: #f08a4b;
+  --north: #e5584d; --south: #45a96a; --copper: #d08a45; --core: #3a4350; --focus: #5aa6e8;
+}
+*, *::before, *::after { box-sizing: inherit; }
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 1.05rem; line-height: 1.45;
+}
+.wrap { max-width: 1240px; margin: 0 auto; padding: 1.25rem 1rem 2rem; }
+h1 { font-size: 1.9rem; font-weight: 700; margin: 0 0 .25rem; letter-spacing: -.01em; }
+.lead { margin: 0 0 1.1rem; color: var(--muted); max-width: 75ch; }
+.panel { background: var(--surface); border: 1px solid var(--grid); border-radius: 6px; overflow: hidden; }
+canvas { display: block; width: 100%; aspect-ratio: 2.15 / 1; touch-action: none; }
+canvas.manual { cursor: grab; }
+canvas.manual:active { cursor: grabbing; }
+canvas:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+.below { display: grid; grid-template-columns: 1fr 0.8fr 1.2fr; gap: 1rem; margin-top: 1rem; }
+.box { background: var(--surface); border: 1px solid var(--grid); border-radius: 6px; padding: 1rem; }
+.box h2 { font-size: 1.05rem; margin: 0 0 .6rem; }
+.seg { display: inline-flex; border: 1px solid var(--axis); border-radius: 6px; overflow: hidden; margin-bottom: .7rem; }
+.seg button { font: inherit; font-size: .98rem; border: 0; padding: .45rem .8rem; background: transparent; color: var(--ink); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+.btn { font: inherit; font-size: .98rem; border: 1px solid var(--axis); border-radius: 6px; padding: .45rem .9rem; background: transparent; color: var(--ink); cursor: pointer; margin-left: .4rem; }
+.btn[hidden] { display: none; }
+.field { margin: .55rem 0; }
+.field label { display: flex; justify-content: space-between; gap: 1rem; font-weight: 600; }
+.field label span { font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
+input[type="range"] { width: 100%; accent-color: var(--ink); }
+.check { display: flex; gap: .5rem; align-items: flex-start; margin-top: .7rem; font-weight: 600; cursor: pointer; }
+.check input { margin-top: .3rem; accent-color: var(--ink); width: 1.05rem; height: 1.05rem; }
+.hint { color: var(--muted); font-size: .95rem; margin: .4rem 0 0; }
+.sel { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: .5rem; margin: .5rem 0; }
+.sel label { font-weight: 600; }
+.sel label.phi { color: var(--phi); }
+.sel label.u { color: var(--u); }
+select { font: inherit; font-size: .98rem; padding: .3rem .4rem; border: 1px solid var(--axis); border-radius: 6px; background: var(--surface); color: var(--ink); }
+select:disabled { opacity: .5; }
+
+.formula { display: flex; align-items: center; gap: .5rem; font-size: 1.7rem; margin: 0 0 .6rem; }
+.frac { display: inline-flex; flex-direction: column; align-items: center; line-height: 1.1; }
+.frac span:first-child { border-bottom: 2px solid currentColor; padding: 0 .15rem; }
+.values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; margin: .4rem 0 .8rem; }
+.val { border-left: 4px solid var(--axis); padding: .15rem .6rem; }
+.val.phi { border-color: var(--phi); }
+.val.u { border-color: var(--u); }
+.val b { display: block; font-size: 1.3rem; font-variant-numeric: tabular-nums; }
+.val small { color: var(--muted); font-size: .9rem; }
+.note { margin: 0; }
+
+@media (max-width: 980px) { .below { grid-template-columns: 1fr 1fr; } .below .box:last-child { grid-column: 1 / -1; } }
+@media (max-width: 700px) {
+  canvas { aspect-ratio: 1 / 1.05; }
+  .below { grid-template-columns: 1fr; }
+  .values { grid-template-columns: 1fr; }
+  h1 { font-size: 1.6rem; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p style="margin:0 0 .6rem"><a href="../" style="color:var(--muted)">← Zur Übersicht</a></p>
+  <h1>Induktionsgesetz</h1>
+  <p class="lead">Ein Dauermagnet dreht sich über einer Spule. Rechts zeigt ein Zweikanal-Oszilloskop die induzierte Spannung (Kanal 1) und den magnetischen Fluss in der Spule (Kanal 2).</p>
+
+  <div class="panel"><canvas id="cv" tabindex="0" aria-label="Magnet über einer Spule mit Oszilloskopbild. Im Modus Von Hand mit Pfeiltasten oder durch Ziehen drehen."></canvas></div>
+
+  <div class="below">
+    <div class="box">
+      <h2>Magnet und Spule</h2>
+      <div>
+        <div class="seg" role="group" aria-label="Betriebsart">
+          <button id="modeAuto" aria-pressed="true">Automatisch</button>
+          <button id="modeHand" aria-pressed="false">Von Hand</button>
+        </div>
+        <button id="run" class="btn">Anhalten</button>
+      </div>
+      <div class="field" id="speedField">
+        <label for="speed">Drehzahl n <span id="speedOut"></span></label>
+        <input id="speed" type="range" min="6" max="120" step="6" value="60">
+      </div>
+      <div class="field">
+        <label for="turns">Windungszahl N <span id="turnsOut"></span></label>
+        <input id="turns" type="range" min="100" max="1000" step="100" value="500">
+      </div>
+      <label class="check"><input type="checkbox" id="lines"> Feldlinien zeigen</label>
+      <p class="hint" id="hint"></p>
+    </div>
+
+    <div class="box">
+      <h2>Oszilloskop</h2>
+      <div class="sel">
+        <label class="u" for="divU">Kanal 1 uᵢ</label>
+        <select id="divU">
+          <option value="0.1">0,1 V/Teilung</option>
+          <option value="0.2">0,2 V/Teilung</option>
+          <option value="0.5" selected>0,5 V/Teilung</option>
+          <option value="1">1 V/Teilung</option>
+          <option value="2">2 V/Teilung</option>
+        </select>
+      </div>
+      <div class="sel">
+        <label class="phi" for="divPhi">Kanal 2 Φ</label>
+        <select id="divPhi">
+          <option value="0.05">0,05 mVs/Teilung</option>
+          <option value="0.1" selected>0,1 mVs/Teilung</option>
+          <option value="0.2">0,2 mVs/Teilung</option>
+          <option value="0.5">0,5 mVs/Teilung</option>
+        </select>
+      </div>
+      <div class="sel">
+        <label for="divT">Zeitbasis</label>
+        <select id="divT">
+          <option value="0.1">0,1 s/Teilung</option>
+          <option value="0.25">0,25 s/Teilung</option>
+          <option value="0.5" selected>0,5 s/Teilung</option>
+          <option value="1">1 s/Teilung</option>
+        </select>
+      </div>
+      <label class="check"><input type="checkbox" id="proj"> Kreisbewegung und Projektion des Nordpols auf Φ zeigen</label>
+      <p class="hint" id="projHint" hidden>Die Höhe der Nordpol-Spitze entspricht dem Fluss in der Spule. Kanal 2 ist dafür an den Kreis gekoppelt und steht fest auf 0,1 mVs/Teilung.</p>
+    </div>
+
+    <div class="box">
+      <div class="formula" aria-label="u i gleich minus N mal Delta Phi durch Delta t">
+        <span>u<sub>i</sub> = −N ·</span>
+        <span class="frac"><span>ΔΦ</span><span>Δt</span></span>
+      </div>
+      <div class="values">
+        <div class="val phi"><small>Fluss Φ</small><b id="vPhi">–</b></div>
+        <div class="val phi"><small>ΔΦ/Δt</small><b id="vRate">–</b></div>
+        <div class="val u"><small>Spannung uᵢ</small><b id="vU">–</b></div>
+      </div>
+      <p class="note">Die Spannung ist am größten, wenn sich der Fluss am schnellsten ändert. Das ist dort, wo die Φ-Kurve am steilsten ist, nicht dort, wo sie am höchsten ist. Ruht der Magnet, ist die Spannung null.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const cv = document.getElementById("cv");
+  const ctx = cv.getContext("2d");
+  const $ = id => document.getElementById(id);
+
+  const PHI_MAX = 0.4e-3;          // Vs
+  const OMEGA_MAX = 2 * Math.PI * 120 / 60;
+  const DIV_Y = 4;                 // Teilungen je Halbebene
+  const DIV_X = 8;                 // Teilungen horizontal
+
+  const s = {
+    mode: "auto", running: !reduced, t: 0, theta: 0, target: 0,
+    n: 60, N: 500, phi: PHI_MAX, dphi: 0, u: 0, lastPhi: PHI_MAX,
+    samples: [], dragging: false, prevA: 0,
+    divPhi: 0.1e-3, divU: 0.5, divT: 0.5, proj: false, lines: false
+  };
+  let G = {};
+
+  const fmt = (v, d) => {
+    if (Math.abs(v) < 0.5 * Math.pow(10, -d)) v = 0;
+    return v.toLocaleString("de-DE", { minimumFractionDigits: d, maximumFractionDigits: d });
+  };
+  const decFor = div => div < 0.1 ? 2 : (div < 1 ? 1 : 0);
+  const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
+  const FONT = 'system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif';
+
+  function fit() {
+    const r = cv.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    cv.width = Math.max(1, Math.round(r.width * dpr));
+    cv.height = Math.max(1, Math.round(r.height * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  if ("ResizeObserver" in window) new ResizeObserver(fit).observe(cv);
+  window.addEventListener("resize", fit);
+  fit();
+
+  function layout(w, h) {
+    const top = 30, gap = 42, bottom = 34;
+    const ph = (h - top - gap - bottom) / 2;
+    const R = ph / 2;                                  // Magnet-Halblänge = halbe Kanalhöhe
+    const lz = Math.max(2 * R + 60, w * 0.3);
+    const left = lz + 58, right = 16;
+    return { w, h, top, gap, bottom, ph, R, lz, left, right, pw: w - left - right,
+             cx: lz / 2, cy: top + ph + gap + ph / 2 };
+  }
+
+  // ---------- Bedienung ----------
+  function updateLabels() {
+    const f = s.n / 60;
+    $("speedOut").textContent = s.n + " min⁻¹ (f = " + fmt(f, 1) + " Hz)";
+    $("turnsOut").textContent = String(s.N);
+    $("hint").textContent = s.mode === "auto"
+      ? "Φ̂ = 0,4 mVs, Scheitelwert û = N · Φ̂ · ω = " + fmt(s.N * PHI_MAX * 2 * Math.PI * f, 2) + " V"
+      : "Magnet mit Maus oder Finger ziehen. Tastatur: Bild anklicken, dann Pfeiltasten.";
+  }
+  $("speed").addEventListener("input", e => { s.n = +e.target.value; updateLabels(); });
+  $("turns").addEventListener("input", e => { s.N = +e.target.value; updateLabels(); });
+  $("run").addEventListener("click", () => { s.running = !s.running; $("run").textContent = s.running ? "Anhalten" : "Starten"; });
+  $("divPhi").addEventListener("change", e => { s.divPhi = +e.target.value * 1e-3; });
+  $("divU").addEventListener("change", e => { s.divU = +e.target.value; });
+  $("divT").addEventListener("change", e => { s.divT = +e.target.value; });
+  $("lines").addEventListener("change", e => { s.lines = e.target.checked; });
+  $("proj").addEventListener("change", e => {
+    s.proj = e.target.checked;
+    if (s.proj) { $("divPhi").value = "0.1"; s.divPhi = 0.1e-3; }
+    $("divPhi").disabled = s.proj;
+    $("projHint").hidden = !s.proj;
+  });
+  function setMode(m) {
+    s.mode = m;
+    $("modeAuto").setAttribute("aria-pressed", m === "auto");
+    $("modeHand").setAttribute("aria-pressed", m === "hand");
+    $("run").hidden = m !== "auto";
+    $("speedField").style.opacity = m === "auto" ? "1" : ".45";
+    $("speed").disabled = m !== "auto";
+    cv.classList.toggle("manual", m === "hand");
+    s.target = s.theta; s.lastPhi = s.phi; s.dphi = 0;
+    if (m === "auto") { s.running = true; $("run").textContent = "Anhalten"; }
+    updateLabels();
+  }
+  $("modeAuto").addEventListener("click", () => setMode("auto"));
+  $("modeHand").addEventListener("click", () => setMode("hand"));
+  $("run").textContent = s.running ? "Anhalten" : "Starten";
+
+  function angleFrom(e) {
+    const r = cv.getBoundingClientRect();
+    return Math.atan2(e.clientX - r.left - G.cx, -(e.clientY - r.top - G.cy));
+  }
+  cv.addEventListener("pointerdown", e => {
+    if (s.mode !== "hand") return;
+    const r = cv.getBoundingClientRect();
+    if (e.clientX - r.left > G.lz) return;
+    const a = angleFrom(e);
+    s.target = s.theta + wrap(a - s.theta);
+    s.prevA = a; s.dragging = true;
+    cv.setPointerCapture(e.pointerId);
+  });
+  cv.addEventListener("pointermove", e => {
+    if (!s.dragging) return;
+    const a = angleFrom(e);
+    s.target += wrap(a - s.prevA); s.prevA = a;
+  });
+  const endDrag = () => { s.dragging = false; };
+  cv.addEventListener("pointerup", endDrag);
+  cv.addEventListener("pointercancel", endDrag);
+  cv.addEventListener("keydown", e => {
+    if (s.mode !== "hand") return;
+    if (e.key === "ArrowLeft" || e.key === "ArrowDown") { s.target -= Math.PI / 12; e.preventDefault(); }
+    if (e.key === "ArrowRight" || e.key === "ArrowUp") { s.target += Math.PI / 12; e.preventDefault(); }
+  });
+
+  // ---------- Simulation ----------
+  let last = null, lastText = 0;
+  function step(ts) {
+    if (last === null) last = ts;
+    const dt = Math.min((ts - last) / 1000, 0.05);
+    last = ts;
+    let advance = false;
+    if (s.mode === "auto") {
+      if (s.running && dt > 0) {
+        const omega = 2 * Math.PI * s.n / 60;
+        s.t += dt; s.theta += omega * dt;
+        s.phi = PHI_MAX * Math.cos(s.theta);
+        s.dphi = -PHI_MAX * omega * Math.sin(s.theta);
+        advance = true;
+      }
+    } else if (dt > 0) {
+      s.t += dt;
+      s.theta += (s.target - s.theta) * Math.min(1, dt / 0.05);
+      s.phi = PHI_MAX * Math.cos(s.theta);
+      const raw = (s.phi - s.lastPhi) / dt;
+      s.dphi += (raw - s.dphi) * Math.min(1, dt / 0.06);
+      s.lastPhi = s.phi;
+      advance = true;
+    }
+    s.u = -s.N * s.dphi;
+    if (advance) {
+      s.samples.push({ t: s.t, phi: s.phi, u: s.u });
+      while (s.samples.length && s.samples[0].t < s.t - 8.5) s.samples.shift();
+    }
+    draw();
+    if (ts - lastText > 100) {
+      lastText = ts;
+      $("vPhi").textContent = fmt(s.phi * 1e3, 2) + " mVs";
+      $("vRate").textContent = fmt(s.dphi * 1e3, 1) + " mVs/s";
+      $("vU").textContent = fmt(s.u, 2) + " V";
+    }
+    requestAnimationFrame(step);
+  }
+
+  // ---------- Zeichnen ----------
+  function arrowV(x, yMid, len, color, width) {
+    if (Math.abs(len) < 4) return;
+    const y1 = yMid - len / 2, y2 = yMid + len / 2, dir = Math.sign(len);
+    const hs = Math.min(11, Math.abs(len) * 0.4);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x, y1); ctx.lineTo(x, y2 - dir * hs * 0.6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, y2); ctx.lineTo(x - hs * 0.6, y2 - dir * hs); ctx.lineTo(x + hs * 0.6, y2 - dir * hs); ctx.closePath(); ctx.fill();
+  }
+
+  function draw() {
+    const w = cv.clientWidth, h = cv.clientHeight;
+    G = layout(w, h);
+    ctx.clearRect(0, 0, w, h);
+    const ink = css("--ink"), muted = css("--muted"), grid = css("--grid"), axis = css("--axis");
+    const cPhi = css("--phi"), cU = css("--u");
+    const { top, gap, ph, R, lz, left, pw, cx, cy } = G;
+    const win = DIV_X * s.divT;
+    const xAt = tt => left + (tt - (s.t - win * 0.9)) / win * pw;
+
+    // --- Feldlinien (Dipolnäherung r = C·sin²ψ, im Magnetsystem) ---
+    if (s.lines) {
+      ctx.save();
+      ctx.beginPath(); ctx.rect(0, 0, lz, h); ctx.clip();
+      ctx.strokeStyle = muted; ctx.fillStyle = muted; ctx.lineWidth = 1.2;
+      const nx = Math.sin(s.theta), ny = -Math.cos(s.theta);   // Richtung Nordpol
+      const px = -ny, py = nx;                                   // senkrecht dazu
+      const pt = (C, psi, side) => {
+        const r = C * Math.sin(psi) * Math.sin(psi);
+        const a = r * Math.cos(psi), b = side * r * Math.sin(psi);
+        return [cx + a * nx + b * px, cy + a * ny + b * py];
+      };
+      [1.4, 2.0, 2.9, 4.2, 6.5].forEach(k => {
+        const C = k * R;
+        [-1, 1].forEach(side => {
+          ctx.beginPath();
+          for (let i = 0; i <= 160; i++) {
+            const psi = 0.02 + (Math.PI - 0.04) * i / 160;
+            const [x, y] = pt(C, psi, side);
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+          // Pfeilspitze: Feldrichtung außen vom N- zum S-Pol
+          const [x1, y1] = pt(C, Math.PI / 2 - 0.03, side), [x2, y2] = pt(C, Math.PI / 2 + 0.03, side);
+          const ang = Math.atan2(y2 - y1, x2 - x1);
+          ctx.save(); ctx.translate(x2, y2); ctx.rotate(ang);
+          ctx.beginPath(); ctx.moveTo(6, 0); ctx.lineTo(-4, -4); ctx.lineTo(-4, 4); ctx.closePath(); ctx.fill();
+          ctx.restore();
+        });
+      });
+      ctx.restore();
+    }
+
+    // --- Spule über dem Magneten ---
+    const coilBottom = cy - R - 22;
+    const coilH = Math.max(40, Math.min(0.8 * ph, coilBottom - top - 30));
+    const coilTop = coilBottom - coilH;
+    const coilW = Math.min(1.3 * R, lz * 0.55);
+    const coilX = cx - coilW / 2;
+    ctx.fillStyle = css("--core");
+    ctx.globalAlpha = s.lines ? 0.75 : 1;
+    ctx.fillRect(cx - coilW * 0.36, coilTop - 6, coilW * 0.72, coilH + 12);
+    ctx.globalAlpha = 1;
+    const count = Math.max(4, Math.min(20, Math.round(s.N / 50)));
+    const sp = coilH / count;
+    ctx.strokeStyle = css("--copper"); ctx.lineCap = "round";
+    ctx.lineWidth = Math.max(1.5, Math.min(5, sp * 0.55));
+    for (let i = 0; i < count; i++) {
+      const y = coilTop + (i + 0.5) * sp;
+      ctx.beginPath(); ctx.moveTo(coilX, y); ctx.lineTo(coilX + coilW, y + sp * 0.35); ctx.stroke();
+    }
+    ctx.lineWidth = 2;
+    const yA = coilTop + 0.85 * sp, yB = coilTop + (count - 0.15) * sp;
+    const xE = lz - 6;
+    ctx.beginPath(); ctx.moveTo(coilX + coilW, yA); ctx.lineTo(xE, yA); ctx.moveTo(coilX + coilW, yB); ctx.lineTo(xE, yB); ctx.stroke();
+    ctx.fillStyle = css("--surface"); ctx.strokeStyle = ink; ctx.lineWidth = 1.5;
+    [yA, yB].forEach(y => { ctx.beginPath(); ctx.arc(xE, y, 4, 0, 2 * Math.PI); ctx.fill(); ctx.stroke(); });
+
+    // Pfeile: positiv = nach oben durch die Spule
+    const mid = coilTop + coilH / 2, maxLen = coilH * 0.85;
+    arrowV(cx - coilW * 0.14, mid, -(s.phi / PHI_MAX) * maxLen, cPhi, 4);
+    const g = Math.max(-1, Math.min(1, -s.dphi / (PHI_MAX * OMEGA_MAX * 0.6)));
+    arrowV(cx + coilW * 0.14, mid, -g * maxLen, cU, 4);
+
+    ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.font = "13px " + FONT;
+    ctx.fillStyle = cPhi; ctx.fillRect(10, 12, 14, 4);
+    ctx.fillStyle = ink; ctx.fillText("Fluss Φ des Magneten", 30, 18);
+    ctx.fillStyle = cU; ctx.fillRect(10, 30, 14, 4);
+    ctx.fillStyle = ink; ctx.fillText("Feld des Induktionsstroms (Lenz)", 30, 36);
+
+    // --- Oszilloskop-Kanäle ---
+    function channel(y0, div, key, color, title, scale) {
+      const range = div * DIV_Y;
+      const yAt = v => y0 + ph / 2 - v / range * (ph / 2);
+      ctx.strokeStyle = grid; ctx.lineWidth = 1;
+      for (let i = 0; i <= DIV_X; i++) {
+        const x = left + i * pw / DIV_X;
+        ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y0 + ph); ctx.stroke();
+      }
+      const every = ph / (2 * DIV_Y) < 18 ? 2 : 1;
+      ctx.font = "13px " + FONT; ctx.textAlign = "right"; ctx.fillStyle = muted;
+      for (let k = -DIV_Y; k <= DIV_Y; k++) {
+        const v = k * div, y = yAt(v);
+        ctx.strokeStyle = k === 0 ? axis : grid; ctx.lineWidth = k === 0 ? 1.5 : 1;
+        ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(left + pw, y); ctx.stroke();
+        if (k % every === 0) ctx.fillText(fmt(v * scale, decFor(div * scale)), left - 6, y + 4);
+      }
+      ctx.textAlign = "left"; ctx.fillStyle = color; ctx.font = "600 14px " + FONT;
+      ctx.fillText(title, left, y0 - 9);
+
+      ctx.save();
+      ctx.beginPath(); ctx.rect(left, y0, pw, ph); ctx.clip();
+      ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.lineJoin = "round";
+      ctx.beginPath();
+      let started = false;
+      for (const p of s.samples) {
+        const x = xAt(p.t);
+        if (x < left - 10) continue;
+        const y = yAt(p[key]);
+        if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      if (s.samples.length) {
+        if (key === "phi") {
+          const d = win * 0.06;
+          ctx.setLineDash([6, 5]); ctx.lineWidth = 2; ctx.strokeStyle = cU;
+          ctx.beginPath();
+          ctx.moveTo(xAt(s.t - d), yAt(s.phi - s.dphi * d));
+          ctx.lineTo(xAt(s.t + d), yAt(s.phi + s.dphi * d));
+          ctx.stroke(); ctx.setLineDash([]);
+        }
+        ctx.fillStyle = color; ctx.beginPath(); ctx.arc(xAt(s.t), yAt(s[key]), 5, 0, 2 * Math.PI); ctx.fill();
+      }
+      ctx.restore();
+      ctx.strokeStyle = axis; ctx.lineWidth = 1; ctx.strokeRect(left, y0, pw, ph);
+      return yAt;
+    }
+    channel(top, s.divU, "u", cU, "Kanal 1: uᵢ in V", 1);
+    const yPhi = channel(top + ph + gap, s.divPhi, "phi", cPhi, "Kanal 2: Φ in mVs   (gestrichelt: Steigung ΔΦ/Δt)", 1e3);
+
+    const xNow = xAt(s.t);
+    ctx.strokeStyle = axis; ctx.setLineDash([3, 4]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(xNow, top); ctx.lineTo(xNow, top + 2 * ph + gap); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = muted; ctx.font = "13px " + FONT; ctx.textAlign = "right";
+    ctx.fillText("t  (" + fmt(s.divT, s.divT < 0.5 ? 2 : 1) + " s je Teilung)", left + pw, h - 9);
+
+    // --- Kreisbahn und Projektion ---
+    const sx = cx + R * Math.sin(s.theta), sy = cy - R * Math.cos(s.theta);   // Nordpol-Spitze
+    if (s.proj) {
+      ctx.strokeStyle = muted; ctx.lineWidth = 1.5; ctx.setLineDash([5, 5]);
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, 2 * Math.PI); ctx.stroke();
+      // waagerechte Projektion der Magnetspitze (S-Pol) auf Kanal 1
+      ctx.strokeStyle = ink; ctx.lineWidth = 1.5; ctx.setLineDash([7, 5]);
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(xNow, yPhi(s.phi)); ctx.stroke();
+      ctx.setLineDash([]);
+      // Hilfslinie Mitte
+      ctx.strokeStyle = axis; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(cx - R - 6, cy); ctx.lineTo(cx + R + 6, cy); ctx.stroke();
+    }
+
+    // --- Magnet ---
+    const T = R * 0.48;
+    ctx.save();
+    ctx.translate(cx, cy); ctx.rotate(s.theta);
+    ctx.fillStyle = css("--north"); ctx.fillRect(-T / 2, -R, T, R);
+    ctx.fillStyle = css("--south"); ctx.fillRect(-T / 2, 0, T, R);
+    ctx.fillStyle = "#ffffff"; ctx.font = "700 " + Math.round(T * 0.55) + "px " + FONT;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("N", 0, -R / 2); ctx.fillText("S", 0, R / 2);
+    ctx.restore();
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = ink; ctx.beginPath(); ctx.arc(cx, cy, 4, 0, 2 * Math.PI); ctx.fill();
+    if (s.proj) {
+      ctx.fillStyle = ink; ctx.beginPath(); ctx.arc(sx, sy, 5, 0, 2 * Math.PI); ctx.fill();
+    }
+    if (s.mode === "hand") {
+      ctx.fillStyle = muted; ctx.textAlign = "center"; ctx.font = "14px " + FONT;
+      ctx.fillText("Magnet ziehen und drehen", cx, h - 9);
+    }
+  }
+
+  updateLabels();
+  requestAnimationFrame(step);
+})();
+</script>
+</body>
+</html>

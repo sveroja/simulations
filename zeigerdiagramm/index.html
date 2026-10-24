@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Drehstromgenerator – Zeiger- und Liniendiagramm</title>
+<style>
+:root {
+  --bg: #f4f6f9; --surface: #ffffff; --ink: #1c2430; --muted: #5b6675;
+  --grid: #dfe4eb; --axis: #98a3b1;
+  --l1: #8a4b1f; --l2: #1c2430; --l3: #8c96a3;
+  --north: #d23a2f; --south: #2f8a4f; --copper: #b8732e; --core: #cfd4db; --focus: #1f6fb2;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161c; --surface: #1a2029; --ink: #e6ebf1; --muted: #9aa6b4;
+    --grid: #29323e; --axis: #56657a;
+    --l1: #d0884f; --l2: #e6ebf1; --l3: #7f8b99;
+    --north: #e5584d; --south: #45a96a; --copper: #d08a45; --core: #3a4350; --focus: #5aa6e8;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12161c; --surface: #1a2029; --ink: #e6ebf1; --muted: #9aa6b4;
+  --grid: #29323e; --axis: #56657a;
+  --l1: #d0884f; --l2: #e6ebf1; --l3: #7f8b99;
+  --north: #e5584d; --south: #45a96a; --copper: #d08a45; --core: #3a4350; --focus: #5aa6e8;
+}
+*, *::before, *::after { box-sizing: inherit; }
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 1.05rem; line-height: 1.45;
+}
+.wrap { max-width: 1280px; margin: 0 auto; padding: 1.25rem 1rem 2rem; }
+h1 { font-size: 1.9rem; font-weight: 700; margin: 0 0 .25rem; letter-spacing: -.01em; }
+.lead { margin: 0 0 1.1rem; color: var(--muted); max-width: 80ch; }
+.panel { background: var(--surface); border: 1px solid var(--grid); border-radius: 6px; overflow: hidden; }
+canvas { display: block; width: 100%; aspect-ratio: 2.5 / 1; touch-action: none; }
+canvas:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+.below { display: grid; grid-template-columns: 1fr 1.3fr; gap: 1rem; margin-top: 1rem; }
+.box { background: var(--surface); border: 1px solid var(--grid); border-radius: 6px; padding: 1rem; }
+.box h2 { font-size: 1.05rem; margin: 0 0 .6rem; }
+.btn { font: inherit; font-size: .98rem; border: 1px solid var(--axis); border-radius: 6px; padding: .45rem .9rem; background: transparent; color: var(--ink); cursor: pointer; }
+.btn.primary { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.field { margin: .6rem 0; }
+.field label { display: flex; justify-content: space-between; gap: 1rem; font-weight: 600; }
+.field label span { font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
+input[type="range"] { width: 100%; accent-color: var(--ink); }
+input[type="number"] { font: inherit; width: 6rem; padding: .25rem .4rem; border: 1px solid var(--axis); border-radius: 6px; background: var(--surface); color: var(--ink); }
+.row { display: flex; flex-wrap: wrap; gap: .4rem 1.2rem; align-items: center; margin-top: .6rem; }
+.check { display: inline-flex; gap: .4rem; align-items: center; font-weight: 600; cursor: pointer; }
+.check input { accent-color: var(--ink); width: 1.05rem; height: 1.05rem; }
+.l1 { color: var(--l1); } .l2 { color: var(--l2); } .l3 { color: var(--l3); }
+
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: .4rem .5rem; border-bottom: 1px solid var(--grid); }
+th { font-weight: 600; color: var(--muted); font-size: .95rem; }
+td.num { text-align: right; font-size: 1.35rem; font-weight: 700; width: 9rem; }
+td.calc { color: var(--muted); font-size: .98rem; }
+tr.sum td { border-bottom: 0; }
+.note { margin: .8rem 0 0; color: var(--muted); font-size: .98rem; }
+
+@media (max-width: 760px) {
+  canvas { aspect-ratio: 1 / 1.1; }
+  .below { grid-template-columns: 1fr; }
+  h1 { font-size: 1.6rem; }
+  td.num { width: 7rem; font-size: 1.2rem; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p style="margin:0 0 .6rem"><a href="../" style="color:var(--muted)">← Zur Übersicht</a></p>
+  <h1>Drehstromgenerator: Zeigerdiagramm und Liniendiagramm</h1>
+  <p class="lead">Der Läufer dreht sich um den Drehwinkel α. Jeder Zeiger dreht sich mit. Die Höhe der Zeigerspitze ist der Momentanwert der Spannung, das Liniendiagramm trägt diese Höhe über dem Drehwinkel auf.</p>
+
+  <div class="panel"><canvas id="cv" tabindex="0" aria-label="Generator, Zeigerdiagramm und Liniendiagramm. Im Zeigerdiagramm ziehen oder mit Pfeiltasten den Drehwinkel verstellen."></canvas></div>
+
+  <div class="below">
+    <div class="box">
+      <h2>Steuerung</h2>
+      <button id="run" class="btn primary">Anhalten</button>
+      <div class="field">
+        <label for="alpha">Drehwinkel α <span id="alphaOut"></span></label>
+        <input id="alpha" type="range" min="0" max="359" step="1" value="0">
+      </div>
+      <div class="field">
+        <label for="speed">Drehgeschwindigkeit <span id="speedOut"></span></label>
+        <input id="speed" type="range" min="5" max="120" step="5" value="30">
+      </div>
+      <div class="field">
+        <label for="ueff">Strangspannung U (Effektivwert) <span><input id="ueff" type="number" min="1" max="1000" step="1" value="230"> V</span></label>
+      </div>
+      <div class="row">
+        <label class="check l1"><input type="checkbox" id="s1" checked> Strang 1</label>
+        <label class="check l2"><input type="checkbox" id="s2" checked> Strang 2</label>
+        <label class="check l3"><input type="checkbox" id="s3" checked> Strang 3</label>
+      </div>
+      <div class="row">
+        <label class="check"><input type="checkbox" id="proj" checked> Projektionslinien</label>
+      </div>
+    </div>
+
+    <div class="box">
+      <h2>Momentanwerte bei α = <span id="aHead">0°</span></h2>
+      <table>
+        <thead><tr><th>Spannung</th><th>Berechnung</th><th style="text-align:right">Wert</th></tr></thead>
+        <tbody>
+          <tr><td class="l1"><b>u<sub>1</sub></b></td><td class="calc" id="c1"></td><td class="num l1" id="v1"></td></tr>
+          <tr><td class="l2"><b>u<sub>2</sub></b></td><td class="calc" id="c2"></td><td class="num l2" id="v2"></td></tr>
+          <tr><td class="l3"><b>u<sub>3</sub></b></td><td class="calc" id="c3"></td><td class="num l3" id="v3"></td></tr>
+          <tr class="sum"><td><b>Summe</b></td><td class="calc">u<sub>1</sub> + u<sub>2</sub> + u<sub>3</sub></td><td class="num" id="vs"></td></tr>
+        </tbody>
+      </table>
+      <p class="note" id="uhat"></p>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const cv = document.getElementById("cv");
+  const ctx = cv.getContext("2d");
+  const $ = id => document.getElementById(id);
+  const FONT = 'system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif';
+  const RAD = Math.PI / 180;
+  const SHIFT = [0, 120, 240];
+
+  const s = { alpha: 0, running: !reduced, speed: 30, U: 230, show: [true, true, true], proj: true, dragging: false };
+  let G = {};
+
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const fmt = (v, d) => {
+    if (Math.abs(v) < 0.5 * Math.pow(10, -d)) v = 0;
+    return v.toLocaleString("de-DE", { minimumFractionDigits: d, maximumFractionDigits: d });
+  };
+  const uhat = () => s.U * Math.SQRT2;
+  const uk = (k, a) => uhat() * Math.sin((a - SHIFT[k]) * RAD);
+  const norm = a => ((a % 360) + 360) % 360;
+  const colors = () => [css("--l1"), css("--l2"), css("--l3")];
+
+  function fit() {
+    const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    cv.width = Math.max(1, Math.round(r.width * dpr));
+    cv.height = Math.max(1, Math.round(r.height * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  if ("ResizeObserver" in window) new ResizeObserver(fit).observe(cv);
+  window.addEventListener("resize", fit);
+  fit();
+
+  function layout(w, h) {
+    if (w >= 700) {
+      const cy = h / 2 + 6;
+      const R = Math.min(w * 0.105, h * 0.36);
+      return { wide: true, w, h,
+        gen: { cx: w * 0.13, cy, r: Math.min(w * 0.115, h * 0.4) },
+        z: { cx: w * 0.395, cy, R },
+        plot: { left: w * 0.565, right: w - 20, cy, R } };
+    }
+    const topH = h * 0.5;
+    const R = Math.min(w * 0.19, topH * 0.36);
+    return { wide: false, w, h,
+      gen: { cx: w * 0.26, cy: topH / 2 + 6, r: Math.min(w * 0.21, topH * 0.4) },
+      z: { cx: w * 0.74, cy: topH / 2 + 6, R },
+      plot: { left: 52, right: w - 14, cy: topH + (h - topH) / 2 - 4, R: (h - topH) * 0.36 } };
+  }
+
+  // ---------- Bedienung ----------
+  function setAlpha(a) { s.alpha = norm(a); }
+  $("run").addEventListener("click", () => { s.running = !s.running; syncRun(); });
+  function syncRun() { $("run").textContent = s.running ? "Anhalten" : "Starten"; }
+  $("alpha").addEventListener("input", e => { s.running = false; syncRun(); setAlpha(+e.target.value); });
+  $("speed").addEventListener("input", e => { s.speed = +e.target.value; labels(); });
+  $("ueff").addEventListener("input", e => { const v = parseFloat(e.target.value); if (v > 0) s.U = v; labels(); });
+  [1, 2, 3].forEach(k => $("s" + k).addEventListener("change", e => { s.show[k - 1] = e.target.checked; }));
+  $("proj").addEventListener("change", e => { s.proj = e.target.checked; });
+  function labels() {
+    $("speedOut").textContent = s.speed + " °/s";
+    $("uhat").innerHTML = "Scheitelwert: û = √2 · U = √2 · " + fmt(s.U, 0) + " V = " + fmt(uhat(), 0) + " V. "
+      + "Die Zeiger sind um 120° gegeneinander verschoben.";
+  }
+
+  function angleAt(e) {
+    const r = cv.getBoundingClientRect();
+    const x = e.clientX - r.left - G.z.cx, y = e.clientY - r.top - G.z.cy;
+    return { a: Math.atan2(-y, x) / RAD, d: Math.hypot(x, y) };
+  }
+  cv.addEventListener("pointerdown", e => {
+    const p = angleAt(e);
+    if (p.d > G.z.R * 1.35) return;
+    s.dragging = true; s.running = false; syncRun();
+    setAlpha(p.a); cv.setPointerCapture(e.pointerId);
+  });
+  cv.addEventListener("pointermove", e => { if (s.dragging) setAlpha(angleAt(e).a); });
+  const end = () => { s.dragging = false; };
+  cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
+  cv.addEventListener("keydown", e => {
+    const st = e.shiftKey ? 1 : 15;
+    if (e.key === "ArrowRight" || e.key === "ArrowUp") { setAlpha(s.alpha + st); s.running = false; syncRun(); e.preventDefault(); }
+    if (e.key === "ArrowLeft" || e.key === "ArrowDown") { setAlpha(s.alpha - st); s.running = false; syncRun(); e.preventDefault(); }
+    if (e.key === " ") { s.running = !s.running; syncRun(); e.preventDefault(); }
+  });
+
+  // ---------- Zeichenhilfen ----------
+  function arrow(x0, y0, x1, y1, color, width) {
+    const ang = Math.atan2(y1 - y0, x1 - x0), len = Math.hypot(x1 - x0, y1 - y0);
+    const hs = Math.min(13, len * 0.25);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(x0, y0);
+    ctx.lineTo(x1 - Math.cos(ang) * hs * 0.7, y1 - Math.sin(ang) * hs * 0.7); ctx.stroke();
+    ctx.save(); ctx.translate(x1, y1); ctx.rotate(ang);
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-hs, -hs * 0.45); ctx.lineTo(-hs, hs * 0.45); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  function text(t, x, y, color, size, weight, align, base) {
+    ctx.fillStyle = color; ctx.font = (weight || "400") + " " + (size || 13) + "px " + FONT;
+    ctx.textAlign = align || "center"; ctx.textBaseline = base || "middle"; ctx.fillText(t, x, y);
+  }
+
+  // ---------- Generator ----------
+  function drawGenerator(C) {
+    const { cx, cy, r } = G.gen;
+    const ri = r * 0.7;
+    // Ständer
+    ctx.fillStyle = css("--core");
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI); ctx.arc(cx, cy, ri, 0, 2 * Math.PI, true); ctx.fill();
+    ctx.strokeStyle = css("--axis"); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI); ctx.stroke();
+    // Spulen bei 90°, 210°, 330°
+    [90, 210, 330].forEach((deg, k) => {
+      const a = deg * RAD;
+      ctx.save();
+      ctx.translate(cx + Math.cos(a) * ri, cy - Math.sin(a) * ri);
+      ctx.rotate(-a + Math.PI / 2);          // lokale y-Achse zeigt zur Mitte
+      const pw = r * 0.34, ph = r * 0.2;
+      ctx.fillStyle = css("--core");
+      ctx.fillRect(-pw * 0.35, -2, pw * 0.7, ph + 2);
+      ctx.strokeStyle = s.show[k] ? C[k] : css("--copper");
+      ctx.lineWidth = 3;
+      for (let i = 0; i < 4; i++) {
+        const y = 3 + i * (ph - 4) / 3;
+        ctx.beginPath(); ctx.moveTo(-pw / 2, y); ctx.lineTo(pw / 2, y + 2); ctx.stroke();
+      }
+      ctx.restore();
+      const lx = cx + Math.cos(a) * (r + 16), ly = cy - Math.sin(a) * (r + 16);
+      text("L" + (k + 1), lx, ly, C[k], 15, "700");
+    });
+    // Läufer: N-Pol zeigt bei α = 0 auf Spule 1 (oben)
+    const phi = (90 + s.alpha) * RAD;
+    const L = ri * 0.88, T = r * 0.26;
+    ctx.save();
+    ctx.translate(cx, cy); ctx.rotate(-phi);
+    ctx.fillStyle = css("--north"); ctx.fillRect(0, -T / 2, L, T);
+    ctx.fillStyle = css("--south"); ctx.fillRect(-L, -T / 2, L, T);
+    ctx.fillStyle = "#ffffff"; ctx.font = "700 " + Math.round(T * 0.6) + "px " + FONT;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.save(); ctx.translate(L / 2, 0); ctx.rotate(phi); ctx.fillText("N", 0, 1); ctx.restore();
+    ctx.save(); ctx.translate(-L / 2, 0); ctx.rotate(phi); ctx.fillText("S", 0, 1); ctx.restore();
+    ctx.restore();
+    ctx.fillStyle = css("--ink"); ctx.beginPath(); ctx.arc(cx, cy, 4, 0, 2 * Math.PI); ctx.fill();
+    // Drehrichtung
+    ctx.strokeStyle = css("--muted"); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(cx, cy, ri * 0.98, 20 * RAD, 70 * RAD, false); ctx.stroke();
+    text("Generator", cx, cy + r + 24, css("--muted"), 14, "600");
+  }
+
+  // ---------- Zeigerdiagramm ----------
+  function drawPhasors(C) {
+    const { cx, cy, R } = G.z;
+    const muted = css("--muted"), grid = css("--grid"), axis = css("--axis");
+    ctx.strokeStyle = grid; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, 2 * Math.PI); ctx.stroke();
+    ctx.strokeStyle = axis;
+    ctx.beginPath(); ctx.moveTo(cx - R - 8, cy); ctx.lineTo(cx + R + 8, cy); ctx.moveTo(cx, cy - R - 8); ctx.lineTo(cx, cy + R + 8); ctx.stroke();
+    for (let d = 0; d < 360; d += 30) {
+      const a = d * RAD;
+      ctx.strokeStyle = axis;
+      ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * (R - 4), cy - Math.sin(a) * (R - 4)); ctx.lineTo(cx + Math.cos(a) * (R + 4), cy - Math.sin(a) * (R + 4)); ctx.stroke();
+      if (d % 90 === 0) text(d + "°", cx + Math.cos(a) * (R + 20), cy - Math.sin(a) * (R + 16), muted, 13, "400");
+    }
+    text("Zeigerdiagramm", cx, G.wide ? 18 : 14, css("--ink"), 15, "600");
+    // Winkel α
+    if (s.alpha > 1) {
+      ctx.strokeStyle = C[0]; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(cx, cy, R * 0.22, 0, -s.alpha * RAD, true); ctx.stroke();
+      const m = s.alpha / 2 * RAD;
+      text("α", cx + Math.cos(m) * R * 0.32, cy - Math.sin(m) * R * 0.32, C[0], 14, "700");
+    }
+    for (let k = 2; k >= 0; k--) {
+      if (!s.show[k]) continue;
+      const a = (s.alpha - SHIFT[k]) * RAD;
+      const x = cx + Math.cos(a) * R, y = cy - Math.sin(a) * R;
+      arrow(cx, cy, x, y, C[k], 3.5);
+      text("û" + ["₁", "₂", "₃"][k], cx + Math.cos(a) * (R * 0.78) + 14 * Math.sin(a), cy - Math.sin(a) * (R * 0.78) + 14 * Math.cos(a), C[k], 14, "700");
+      // senkrechte Projektion: Höhe = Momentanwert
+      ctx.strokeStyle = C[k]; ctx.lineWidth = 1.2; ctx.setLineDash([3, 4]);
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, cy); ctx.stroke(); ctx.setLineDash([]);
+    }
+    ctx.fillStyle = css("--ink"); ctx.beginPath(); ctx.arc(cx, cy, 3.5, 0, 2 * Math.PI); ctx.fill();
+  }
+
+  // ---------- Liniendiagramm ----------
+  function drawPlot(C) {
+    const { left, right, cy, R } = G.plot;
+    const pw = right - left, top = cy - R * 1.18, bot = cy + R * 1.18;
+    const muted = css("--muted"), grid = css("--grid"), axis = css("--axis");
+    const xAt = a => left + a / 360 * pw;
+    const yAt = u => cy - u / uhat() * R;
+    ctx.lineWidth = 1;
+    for (let d = 0; d <= 360; d += 30) {
+      ctx.strokeStyle = d % 90 === 0 ? axis : grid;
+      ctx.beginPath(); ctx.moveTo(xAt(d), top); ctx.lineTo(xAt(d), bot); ctx.stroke();
+      if (d % 90 === 0) text(d + "°", xAt(d), bot + 14, muted, 13);
+    }
+    [-1, -0.5, 0, 0.5, 1].forEach(f => {
+      const y = cy - f * R;
+      ctx.strokeStyle = f === 0 ? axis : grid; ctx.lineWidth = f === 0 ? 1.5 : 1;
+      ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(right, y); ctx.stroke();
+      text(fmt(f * uhat(), 0), left - 6, y, muted, 12, "400", "right");
+    });
+    text("u in V", left - 6, top - 12, muted, 13, "600", "right");
+    text("α", right, bot + 30, muted, 14, "700", "right");
+    text("Liniendiagramm", left + pw / 2, G.wide ? 18 : top - 14, css("--ink"), 15, "600");
+
+    for (let k = 0; k < 3; k++) {
+      if (!s.show[k]) continue;
+      ctx.strokeStyle = C[k]; ctx.lineWidth = 2.5; ctx.lineJoin = "round";
+      ctx.beginPath();
+      for (let a = 0; a <= 360; a += 2) { const x = xAt(a), y = yAt(uk(k, a)); a ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+      ctx.stroke();
+      text("u" + ["₁", "₂", "₃"][k], right + 2, yAt(uk(k, 360)) - 10, C[k], 13, "700", "right");
+    }
+    // Cursor beim aktuellen Winkel
+    const xa = xAt(s.alpha);
+    ctx.strokeStyle = css("--ink"); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(xa, top); ctx.lineTo(xa, bot); ctx.stroke();
+    for (let k = 0; k < 3; k++) {
+      if (!s.show[k]) continue;
+      const y = yAt(uk(k, s.alpha));
+      if (s.proj && G.wide) {
+        const a = (s.alpha - SHIFT[k]) * RAD;
+        const zx = G.z.cx + Math.cos(a) * G.z.R, zy = G.z.cy - Math.sin(a) * G.z.R;
+        ctx.strokeStyle = C[k]; ctx.lineWidth = 1.2; ctx.setLineDash([6, 5]);
+        ctx.beginPath(); ctx.moveTo(zx, zy); ctx.lineTo(xa, y); ctx.stroke(); ctx.setLineDash([]);
+      }
+      ctx.fillStyle = C[k]; ctx.beginPath(); ctx.arc(xa, y, 5.5, 0, 2 * Math.PI); ctx.fill();
+      ctx.strokeStyle = css("--surface"); ctx.lineWidth = 1.5; ctx.stroke();
+    }
+  }
+
+  // ---------- Momentanwerte ----------
+  let lastText = 0;
+  function updateValues() {
+    const a = Math.round(s.alpha);
+    $("alphaOut").textContent = a + "°";
+    $("aHead").textContent = a + "°";
+    if (document.activeElement !== $("alpha")) $("alpha").value = a % 360;
+    const parts = ["α", "α − 120°", "α − 240°"];
+    let sum = 0;
+    for (let k = 0; k < 3; k++) {
+      const v = uk(k, s.alpha); sum += v;
+      const arg = norm(s.alpha - SHIFT[k]);
+      $("c" + (k + 1)).textContent = fmt(uhat(), 0) + " V · sin(" + parts[k] + ") = " + fmt(uhat(), 0) + " V · sin " + Math.round(arg) + "°";
+      $("v" + (k + 1)).textContent = fmt(v, 0) + " V";
+    }
+    $("vs").textContent = fmt(sum, 0) + " V";
+  }
+
+  // ---------- Schleife ----------
+  let last = null;
+  function loop(ts) {
+    if (last === null) last = ts;
+    const dt = Math.min((ts - last) / 1000, 0.05); last = ts;
+    if (s.running) setAlpha(s.alpha + s.speed * dt);
+    const w = cv.clientWidth, h = cv.clientHeight;
+    G = layout(w, h);
+    ctx.clearRect(0, 0, w, h);
+    const C = colors();
+    drawPlot(C);
+    drawGenerator(C);
+    drawPhasors(C);
+    if (ts - lastText > 80) { lastText = ts; updateValues(); }
+    requestAnimationFrame(loop);
+  }
+  syncRun(); labels(); updateValues();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
