@@ -106,8 +106,8 @@ tr.sum td { border-bottom: 0; }
       </div>
       <div class="row">
         <label class="check l1"><input type="checkbox" id="s1" checked> Strang 1</label>
-        <label class="check l2"><input type="checkbox" id="s2" checked> Strang 2</label>
-        <label class="check l3"><input type="checkbox" id="s3" checked> Strang 3</label>
+        <label class="check l2"><input type="checkbox" id="s2"> Strang 2</label>
+        <label class="check l3"><input type="checkbox" id="s3"> Strang 3</label>
       </div>
       <div class="row">
         <label class="check"><input type="checkbox" id="proj" checked> Projektionslinien</label>
@@ -142,7 +142,7 @@ tr.sum td { border-bottom: 0; }
   const RAD = Math.PI / 180;
   const SHIFT = [0, 120, 240];
 
-  const s = { alpha: 0, running: !reduced, speed: 30, U: 230, show: [true, true, true], proj: true, dragging: false, f: 50, xax: "deg" };
+  const s = { alpha: 0, running: !reduced, speed: 30, U: 230, show: [true, false, false], proj: true, dragging: false, f: 50, xax: "deg" };
   let G = {};
 
   const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
@@ -170,14 +170,14 @@ tr.sum td { border-bottom: 0; }
       const cy = h / 2 + 6;
       const R = Math.min(w * 0.105, h * 0.36);
       return { wide: true, w, h,
-        gen: { cx: w * 0.13, cy, r: Math.min(w * 0.115, h * 0.4) },
+        gen: { cx: w * 0.13, cy: cy - h * 0.04, r: Math.min(w * 0.105, h * 0.33) },
         z: { cx: w * 0.395, cy, R },
         plot: { left: w * 0.565, right: w - 20, cy, R } };
     }
     const topH = h * 0.5;
     const R = Math.min(w * 0.19, topH * 0.36);
     return { wide: false, w, h,
-      gen: { cx: w * 0.26, cy: topH / 2 + 6, r: Math.min(w * 0.21, topH * 0.4) },
+      gen: { cx: w * 0.26, cy: topH / 2 - 4, r: Math.min(w * 0.19, topH * 0.33) },
       z: { cx: w * 0.74, cy: topH / 2 + 6, R },
       plot: { left: 52, right: w - 14, cy: topH + (h - topH) / 2 - 4, R: (h - topH) * 0.36 } };
   }
@@ -189,7 +189,12 @@ tr.sum td { border-bottom: 0; }
   $("alpha").addEventListener("input", e => { s.running = false; syncRun(); setAlpha(+e.target.value); });
   $("speed").addEventListener("input", e => { s.speed = +e.target.value; labels(); });
   $("ueff").addEventListener("input", e => { const v = parseFloat(e.target.value); if (v > 0) s.U = v; labels(); });
-  [1, 2, 3].forEach(k => $("s" + k).addEventListener("change", e => { s.show[k - 1] = e.target.checked; }));
+  function syncRows() {
+    [1, 2, 3].forEach(k => { $("v" + k).closest("tr").hidden = !s.show[k - 1]; });
+    $("vs").closest("tr").hidden = !(s.show[0] && s.show[1] && s.show[2]);
+  }
+  [1, 2, 3].forEach(k => $("s" + k).addEventListener("change", e => { s.show[k - 1] = e.target.checked; syncRows(); }));
+  syncRows();
   $("proj").addEventListener("change", e => { s.proj = e.target.checked; });
   $("freq").addEventListener("input", e => { const v = parseFloat(e.target.value); if (v > 0) s.f = v; labels(); });
   document.querySelectorAll('input[name="xax"]').forEach(r => r.addEventListener("change", e => { s.xax = e.target.value; }));
@@ -245,6 +250,12 @@ tr.sum td { border-bottom: 0; }
   function drawGenerator(C) {
     const { cx, cy, r } = G.gen;
     const ri = r * 0.7;
+    // Halter (Fuß mit Grundplatte)
+    ctx.fillStyle = css("--axis");
+    ctx.beginPath();
+    ctx.moveTo(cx - r * 0.55, cy + r * 0.6); ctx.lineTo(cx + r * 0.55, cy + r * 0.6);
+    ctx.lineTo(cx + r * 0.75, cy + r * 1.12); ctx.lineTo(cx - r * 0.75, cy + r * 1.12); ctx.closePath(); ctx.fill();
+    ctx.fillRect(cx - r * 1.0, cy + r * 1.12, r * 2.0, r * 0.1);
     // Ständer
     ctx.fillStyle = css("--core");
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI); ctx.arc(cx, cy, ri, 0, 2 * Math.PI, true); ctx.fill();
@@ -271,7 +282,7 @@ tr.sum td { border-bottom: 0; }
     });
     // Läufer: N-Pol zeigt bei α = 0 auf Spule 1 (oben)
     const phi = (90 + s.alpha) * RAD;
-    const L = ri * 0.88, T = r * 0.26;
+    const L = r * 0.4, T = r * 0.22;   // Luftspalt zu den Polschuhen (innen bei 0,5 r)
     ctx.save();
     ctx.translate(cx, cy); ctx.rotate(-phi);
     ctx.fillStyle = css("--north"); ctx.fillRect(0, -T / 2, L, T);
@@ -282,10 +293,7 @@ tr.sum td { border-bottom: 0; }
     ctx.save(); ctx.translate(-L / 2, 0); ctx.rotate(phi); ctx.fillText("S", 0, 1); ctx.restore();
     ctx.restore();
     ctx.fillStyle = css("--ink"); ctx.beginPath(); ctx.arc(cx, cy, 4, 0, 2 * Math.PI); ctx.fill();
-    // Drehrichtung
-    ctx.strokeStyle = css("--muted"); ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(cx, cy, ri * 0.98, 20 * RAD, 70 * RAD, false); ctx.stroke();
-    text("Generator", cx, cy + r + 24, css("--muted"), 14, "600");
+    text("Generator", cx, cy + r * 1.22 + 16, css("--muted"), 14, "600");
   }
 
   // ---------- Zeigerdiagramm ----------
