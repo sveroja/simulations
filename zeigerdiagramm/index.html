@@ -90,14 +90,12 @@ tr.sum td { border-bottom: 0; }
         <input id="alpha" type="range" min="0" max="359" step="1" value="0">
       </div>
       <div class="field">
-        <label for="speed">Drehgeschwindigkeit <span id="speedOut"></span></label>
-        <input id="speed" type="range" min="5" max="120" step="5" value="30">
+        <label for="speed">Drehzahl n <span id="speedOut"></span></label>
+        <input id="speed" type="range" min="600" max="6000" step="300" value="3000">
+        <p class="note" style="margin:.3rem 0 0">Ein Polpaar: f = n / 60. Die Darstellung läuft 200-fach verlangsamt. Im realen Generator steigt mit der Drehzahl auch die Spannung, hier bleibt U zur besseren Übersicht fest.</p>
       </div>
       <div class="field">
         <label for="ueff">Strangspannung U (Effektivwert) <span><input id="ueff" type="number" min="1" max="1000" step="1" value="230"> V</span></label>
-      </div>
-      <div class="field">
-        <label for="freq">Frequenz f <span><input id="freq" type="number" min="1" max="1000" step="1" value="50"> Hz</span></label>
       </div>
       <div class="row">
         <span style="font-weight:600">x-Achse:</span>
@@ -141,8 +139,9 @@ tr.sum td { border-bottom: 0; }
   const FONT = "system-ui, -apple-system, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif";
   const RAD = Math.PI / 180;
   const SHIFT = [0, 120, 240];
+  const SLOW = 200;   // Zeitlupenfaktor der Darstellung
 
-  const s = { alpha: 0, running: !reduced, speed: 30, U: 230, show: [true, false, false], proj: true, dragging: false, f: 50, xax: "deg" };
+  const s = { alpha: 0, running: !reduced, n: 3000, U: 230, show: [true, false, false], proj: true, dragging: false, f: 50, xax: "deg" };
   let G = {};
 
   const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
@@ -187,7 +186,7 @@ tr.sum td { border-bottom: 0; }
   $("run").addEventListener("click", () => { s.running = !s.running; syncRun(); });
   function syncRun() { $("run").textContent = s.running ? "Anhalten" : "Starten"; }
   $("alpha").addEventListener("input", e => { s.running = false; syncRun(); setAlpha(+e.target.value); });
-  $("speed").addEventListener("input", e => { s.speed = +e.target.value; labels(); });
+  $("speed").addEventListener("input", e => { s.n = +e.target.value; s.f = s.n / 60; labels(); });
   $("ueff").addEventListener("input", e => { const v = parseFloat(e.target.value); if (v > 0) s.U = v; labels(); });
   function syncRows() {
     [1, 2, 3].forEach(k => { $("v" + k).closest("tr").hidden = !s.show[k - 1]; });
@@ -196,11 +195,10 @@ tr.sum td { border-bottom: 0; }
   [1, 2, 3].forEach(k => $("s" + k).addEventListener("change", e => { s.show[k - 1] = e.target.checked; syncRows(); }));
   syncRows();
   $("proj").addEventListener("change", e => { s.proj = e.target.checked; });
-  $("freq").addEventListener("input", e => { const v = parseFloat(e.target.value); if (v > 0) s.f = v; labels(); });
   document.querySelectorAll('input[name="xax"]').forEach(r => r.addEventListener("change", e => { s.xax = e.target.value; }));
   const Tms = () => 1000 / s.f;
   function labels() {
-    $("speedOut").textContent = s.speed + " °/s";
+    $("speedOut").textContent = s.n + " min⁻¹ (f = " + fmt(s.f, 0) + " Hz)";
     const T = Tms();
     $("omega").innerHTML = "Periodendauer: T = 1 / f = " + fmt(T, T < 10 ? 2 : 1) + " ms. "
       + "Winkelgeschwindigkeit: ω = 2π / T = 2π · f = " + fmt(2 * Math.PI * s.f, 1) + " s⁻¹. "
@@ -263,6 +261,7 @@ tr.sum td { border-bottom: 0; }
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI); ctx.stroke();
     // Spulen bei 90°, 210°, 330°
     [90, 210, 330].forEach((deg, k) => {
+      if (!s.show[k]) return;   // nicht benutzte Spulen ausblenden
       const a = deg * RAD;
       ctx.save();
       ctx.translate(cx + Math.cos(a) * ri, cy - Math.sin(a) * ri);
@@ -408,7 +407,7 @@ tr.sum td { border-bottom: 0; }
   function loop(ts) {
     if (last === null) last = ts;
     const dt = Math.min((ts - last) / 1000, 0.05); last = ts;
-    if (s.running) setAlpha(s.alpha + s.speed * dt);
+    if (s.running) setAlpha(s.alpha + 360 * s.f / SLOW * dt);
     const w = cv.clientWidth, h = cv.clientHeight;
     G = layout(w, h);
     ctx.clearRect(0, 0, w, h);
