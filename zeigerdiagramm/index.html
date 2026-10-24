@@ -96,6 +96,14 @@ tr.sum td { border-bottom: 0; }
       <div class="field">
         <label for="ueff">Strangspannung U (Effektivwert) <span><input id="ueff" type="number" min="1" max="1000" step="1" value="230"> V</span></label>
       </div>
+      <div class="field">
+        <label for="freq">Frequenz f <span><input id="freq" type="number" min="1" max="1000" step="1" value="50"> Hz</span></label>
+      </div>
+      <div class="row">
+        <span style="font-weight:600">x-Achse:</span>
+        <label class="check"><input type="radio" name="xax" value="deg" checked> Winkel α in °</label>
+        <label class="check"><input type="radio" name="xax" value="ms"> Zeit t in ms</label>
+      </div>
       <div class="row">
         <label class="check l1"><input type="checkbox" id="s1" checked> Strang 1</label>
         <label class="check l2"><input type="checkbox" id="s2" checked> Strang 2</label>
@@ -107,7 +115,7 @@ tr.sum td { border-bottom: 0; }
     </div>
 
     <div class="box">
-      <h2>Momentanwerte bei α = <span id="aHead">0°</span></h2>
+      <h2>Momentanwerte bei α = <span id="aHead">0°</span> <span style="font-weight:400;color:var(--muted)">(t = <span id="tHead">0</span> ms)</span></h2>
       <table>
         <thead><tr><th>Spannung</th><th>Berechnung</th><th style="text-align:right">Wert</th></tr></thead>
         <tbody>
@@ -118,6 +126,8 @@ tr.sum td { border-bottom: 0; }
         </tbody>
       </table>
       <p class="note" id="uhat"></p>
+      <p class="note" id="omega"></p>
+      <p class="note"><b style="color:var(--ink)">Warum Zeiger?</b> Das Liniendiagramm zeigt den zeitlichen Verlauf, wie ihn das Oszilloskop darstellt. Zum Rechnen braucht man diesen Verlauf nicht: Ein Zeiger enthält bereits alles. Seine Länge ist der Scheitelwert, seine Drehgeschwindigkeit ω ergibt sich aus der Frequenz, und seine Lage bei t = 0 ist die Phasenlage.</p>
     </div>
   </div>
 </div>
@@ -128,11 +138,11 @@ tr.sum td { border-bottom: 0; }
   const cv = document.getElementById("cv");
   const ctx = cv.getContext("2d");
   const $ = id => document.getElementById(id);
-  const FONT = 'system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif';
+  const FONT = "system-ui, -apple-system, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif";
   const RAD = Math.PI / 180;
   const SHIFT = [0, 120, 240];
 
-  const s = { alpha: 0, running: !reduced, speed: 30, U: 230, show: [true, true, true], proj: true, dragging: false };
+  const s = { alpha: 0, running: !reduced, speed: 30, U: 230, show: [true, true, true], proj: true, dragging: false, f: 50, xax: "deg" };
   let G = {};
 
   const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
@@ -181,8 +191,15 @@ tr.sum td { border-bottom: 0; }
   $("ueff").addEventListener("input", e => { const v = parseFloat(e.target.value); if (v > 0) s.U = v; labels(); });
   [1, 2, 3].forEach(k => $("s" + k).addEventListener("change", e => { s.show[k - 1] = e.target.checked; }));
   $("proj").addEventListener("change", e => { s.proj = e.target.checked; });
+  $("freq").addEventListener("input", e => { const v = parseFloat(e.target.value); if (v > 0) s.f = v; labels(); });
+  document.querySelectorAll('input[name="xax"]').forEach(r => r.addEventListener("change", e => { s.xax = e.target.value; }));
+  const Tms = () => 1000 / s.f;
   function labels() {
     $("speedOut").textContent = s.speed + " °/s";
+    const T = Tms();
+    $("omega").innerHTML = "Periodendauer: T = 1 / f = " + fmt(T, T < 10 ? 2 : 1) + " ms. "
+      + "Winkelgeschwindigkeit: ω = 2π / T = 2π · f = " + fmt(2 * Math.PI * s.f, 1) + " s⁻¹. "
+      + "Umrechnung: α = 360° · t / T bzw. α = ω · t.";
     $("uhat").innerHTML = "Scheitelwert: û = √2 · U = √2 · " + fmt(s.U, 0) + " V = " + fmt(uhat(), 0) + " V. "
       + "Die Zeiger sind um 120° gegeneinander verschoben.";
   }
@@ -317,7 +334,10 @@ tr.sum td { border-bottom: 0; }
     for (let d = 0; d <= 360; d += 30) {
       ctx.strokeStyle = d % 90 === 0 ? axis : grid;
       ctx.beginPath(); ctx.moveTo(xAt(d), top); ctx.lineTo(xAt(d), bot); ctx.stroke();
-      if (d % 90 === 0) text(d + "°", xAt(d), bot + 14, muted, 13);
+      if (d % 90 === 0) {
+        const T = Tms(), v = d / 360 * T;
+        text(s.xax === "ms" ? fmt(v, (Math.round(v * 10) / 10) % 1 ? 1 : 0) : d + "°", xAt(d), bot + 14, muted, 13);
+      }
     }
     [-1, -0.5, 0, 0.5, 1].forEach(f => {
       const y = cy - f * R;
@@ -326,7 +346,7 @@ tr.sum td { border-bottom: 0; }
       text(fmt(f * uhat(), 0), left - 6, y, muted, 12, "400", "right");
     });
     text("u in V", left - 6, top - 12, muted, 13, "600", "right");
-    text("α", right, bot + 30, muted, 14, "700", "right");
+    text(s.xax === "ms" ? "t in ms" : "α", right, bot + 30, muted, 14, "700", "right");
     text("Liniendiagramm", left + pw / 2, G.wide ? 18 : top - 14, css("--ink"), 15, "600");
 
     for (let k = 0; k < 3; k++) {
@@ -361,6 +381,8 @@ tr.sum td { border-bottom: 0; }
     const a = Math.round(s.alpha);
     $("alphaOut").textContent = a + "°";
     $("aHead").textContent = a + "°";
+    const tt = s.alpha / 360 * Tms();
+    $("tHead").textContent = fmt(tt, 2);
     if (document.activeElement !== $("alpha")) $("alpha").value = a % 360;
     const parts = ["α", "α − 120°", "α − 240°"];
     let sum = 0;
